@@ -1,167 +1,232 @@
-# 🚀 Быстрый старт - СтудХаб
+# 🚀 Быстрый старт - СтудХаб (Student Connect)
 
-## ✅ Что уже работает:
+## 📱 О проекте
 
-### Экраны:
-1. **Splash Screen** - анимированная заставка с логотипом
-2. **Home (Домой)** - лента проектов с карточками в стиле Instagram
-3. **Profile (Профиль)** - портфолио пользователя с сеткой проектов
-4. **Messages (Сообщения)** - список чатов
-5. **Search (Поиск)** - поиск проектов и студентов
-6. **Project Detail** - детальная информация о проекте
+**СтудХаб** - мобильная платформа для студентов, объединяющая социальную сеть, портфолио проектов и мессенджер.
 
-### Функции:
-- ✅ Темная тема по умолчанию
-- ✅ Нижняя навигация (5 табов)
-- ✅ Stories row на главном экране
-- ✅ Лайки, комментарии, сохранения
-- ✅ Карусель изображений
-- ✅ Pull-to-refresh
-- ✅ Skeleton загрузка
-- ✅ Плавные анимации
-- ✅ Мок-данные для тестирования
+- 🌐 **Backend:** Облачный сервер на Render.com
+- 📱 **Frontend:** Flutter приложение для Android
+- 💾 **База данных:** SQLite на сервере
+- 🔐 **Аутентификация:** JWT токены
 
-## 📱 Запуск приложения:
+---
 
-### Вариант 1: VS Code
-1. Открой папку проекта в VS Code
-2. Нажми **F5** или кнопку ▶️ в нижней панели
+## ⚡ Быстрый запуск (5 минут)
 
-### Вариант 2: Командная строка
+### Шаг 1: Проверьте Flutter
+
+```bash
+flutter doctor
+```
+
+Если Flutter не установлен, см. [SETUP_GUIDE.md](SETUP_GUIDE.md)
+
+### Шаг 2: Установите зависимости
+
 ```bash
 cd C:\Users\admin\vs_code_dock\flutter_apps\student-connect-app
+flutter pub get
+```
+
+### Шаг 3: Подключите устройство
+
+**Вариант A: Физическое Android устройство**
+1. Включите "Режим разработчика" на телефоне
+2. Включите "Отладка по USB"
+3. Подключите телефон к компьютеру
+
+**Вариант B: Эмулятор Android**
+```bash
+flutter emulators                    # Список эмуляторов
+flutter emulators --launch <id>      # Запустить эмулятор
+```
+
+### Шаг 4: Запустите приложение
+
+```bash
 flutter run
 ```
 
-### Вариант 3: Конкретное устройство
+Или для конкретного устройства:
 ```bash
-flutter devices                    # Узнать список устройств
-flutter run -d emulator-5554      # Запустить на эмуляторе
+flutter devices                      # Посмотреть список
+flutter run -d <device-id>           # Запустить на устройстве
 ```
 
-## 🔧 Если что-то не работает:
+**Готово!** Приложение запустится и подключится к облачному серверу.
 
-### Ошибка: "No devices found"
+---
+
+## 🌐 Backend сервер
+
+### Облачный сервер (Production)
+
+- **URL:** https://student-connect-backend.onrender.com
+- **Статус:** Работает 24/7
+- **Регион:** Frankfurt (EU)
+- **Платформа:** Render.com (бесплатный план)
+
+⚠️ **Важно:** Бесплатный сервер засыпает после 15 минут неактивности. Первый запрос после сна занимает ~30-50 секунд.
+
+### Проверка работы сервера
+
+```bash
+curl https://student-connect-backend.onrender.com/
+```
+
+Должен вернуть JSON с информацией об API.
+
+### Локальный backend (для разработки)
+
+Если хотите запустить backend локально:
+
+```bash
+cd backend
+npm install
+npm start
+```
+
+Затем измените URL в `lib/services/api_service.dart`:
+```dart
+static const String _baseUrl = 'http://localhost:3000';
+```
+
+---
+
+## ✅ Что уже работает
+
+### Функционал:
+- ✅ Регистрация и авторизация пользователей
+- ✅ Лента постов с изображениями
+- ✅ Создание и просмотр проектов
+- ✅ Скачивание ZIP-файлов проектов
+- ✅ Чаты и сообщения между пользователями
+- ✅ Профили пользователей с портфолио
+- ✅ Поиск пользователей и проектов
+- ✅ Лайки и комментарии
+- ✅ Подписки на пользователей
+- ✅ Уведомления
+
+### UI/UX:
+- ✅ Темная тема (Instagram-style)
+- ✅ Плавные анимации и переходы
+- ✅ Skeleton загрузка
+- ✅ Pull-to-refresh
+- ✅ Карусель изображений
+- ✅ Адаптивная верстка
+
+---
+
+## 📂 Структура проекта
+
+```
+student-connect-app/
+├── lib/                           # Flutter приложение
+│   ├── main.dart                  # Точка входа
+│   ├── core/                      # Общие компоненты
+│   │   ├── theme/                 # Темы и цвета
+│   │   ├── widgets/               # Переиспользуемые виджеты
+│   │   └── constants/             # Константы
+│   ├── models/                    # Модели данных
+│   ├── services/                  # API сервисы
+│   │   └── api_service.dart       # HTTP клиент (Dio)
+│   ├── providers/                 # State management (Riverpod)
+│   ├── features/                  # Экраны по функциям
+│   │   ├── auth/                  # Авторизация
+│   │   ├── home/                  # Главная лента
+│   │   ├── profile/               # Профиль
+│   │   ├── messages/              # Чаты
+│   │   ├── search/                # Поиск
+│   │   ├── post/                  # Посты
+│   │   └── project/               # Проекты
+│   └── data/mock/                 # Мок-данные для тестов
+│
+├── backend/                       # Node.js backend
+│   ├── server.js                  # Express сервер
+│   ├── database.js                # SQLite база данных
+│   ├── package.json               # Зависимости
+│   └── uploads/                   # Загруженные файлы
+│
+├── android/                       # Android конфигурация
+├── pubspec.yaml                   # Flutter зависимости
+├── QUICKSTART.md                  # Этот файл
+├── SETUP_GUIDE.md                 # Полная инструкция
+└── GUIDEFORAI.md                  # Гайд для AI ассистентов
+```
+
+---
+
+## 🔧 Полезные команды
+
+### Flutter
+
+```bash
+flutter run                        # Запустить приложение
+flutter run -d <device>            # Запустить на устройстве
+flutter devices                    # Список устройств
+flutter clean                      # Очистить кэш
+flutter pub get                    # Установить зависимости
+flutter analyze                    # Проверить код
+flutter doctor                     # Диагностика
+```
+
+### Горячая перезагрузка (во время работы)
+
+- `r` - Hot reload (быстрая перезагрузка)
+- `R` - Hot restart (полная перезагрузка)
+- `q` - Выход
+
+---
+
+## 🐛 Частые проблемы
+
+### "No devices found"
+
 ```bash
 flutter devices                    # Проверить устройства
-flutter emulators                  # Запустить эмулятор
-flutter doctor                     # Проверить установку Flutter
+flutter emulators                  # Список эмуляторов
 ```
 
-### Ошибка: "Build failed"
+### "Build failed"
+
 ```bash
-flutter clean                      # Очистить проект
-flutter pub get                    # Установить зависимости
-flutter run                        # Запустить снова
+flutter clean
+flutter pub get
+flutter run
 ```
 
-### Ошибка: "Android Gradle Plugin"
-Убедись, что в `android/settings.gradle.kts` версия не ниже 8.1.1:
-```kotlin
-id("com.android.application") version "8.11.1" apply false
-```
+### "Connection refused" / "Network error"
 
-## 📂 Структура проекта:
-
-```
-lib/
-├── main.dart                      # Точка входа
-├── core/
-│   ├── theme/
-│   │   ├── app_colors.dart        # Цветовая палитра
-│   │   └── app_theme.dart         # Темы Material 3
-│   ├── constants/
-│   │   └── app_constants.dart     # Константы приложения
-│   └── widgets/
-│       ├── custom_avatar.dart     # Кастомный аватар
-│       ├── custom_buttons.dart    # Градиентные кнопки
-│       └── skeletons.dart         # Skeleton загрузка
-├── models/
-│   ├── user.dart                  # Модель пользователя
-│   ├── project.dart               # Модель проекта
-│   ├── post.dart                  # Модель поста
-│   └── message.dart               # Модель сообщения
-├── providers/
-│   └── app_providers.dart         # Riverpod провайдеры
-├── data/mock/
-│   ├── mock_users.dart            # Мок-пользователи
-│   ├── mock_projects.dart         # Мок-проекты
-│   ├── mock_posts.dart            # Мок-посты
-│   └── mock_chats.dart            # Мок-чаты
-└── features/
-    ├── splash/
-    │   └── splash_screen.dart
-    ├── home/
-    │   ├── home_screen.dart
-    │   └── widgets/
-    │       ├── post_card.dart
-    │       └── stories_row.dart
-    ├── profile/
-    │   └── profile_screen.dart
-    ├── messages/
-    │   ├── messages_screen.dart
-    │   └── chat_screen.dart
-    ├── search/
-    │   └── search_screen.dart
-    └── project/
-        └── project_detail_screen.dart
-```
-
-## 🎨 Цветовая схема:
-
-```dart
-Primary:       #6366F1 (Indigo)
-Accent:        #06B6D4 (Cyan)
-Background:    #121212 (Dark)
-Surface:       #1E1E1E
-Success:       #22C55E (Green)
-Error:         #EF4444 (Red)
-```
-
-## 🛠 Технологии:
-
-- **Flutter** 3.x
-- **Dart** 3.x
-- **Riverpod** - state management
-- **Material 3** - дизайн
-- **google_fonts** - шрифты Inter/Poppins
-- **cached_network_image** - кэширование изображений
-- **carousel_slider** - карусель
-- **flutter_animate** - анимации
-
-## 📝 Следующие шаги:
-
-### Можно доработать:
-1. ⏳ Экраны Login/Register
-2. ⏳ Форма создания проекта
-3. ⏳ Комментарии к проектам
-4. ⏳ Редактирование профиля
-5. ⏳ Загрузка изображений
-6. ⏳ Backend интеграция
-
-### Готово к использованию:
-- ✅ Навигация между экранами
-- ✅ Отображение ленты проектов
-- ✅ Просмотр профиля
-- ✅ Просмотр чатов
-- ✅ Поиск проектов
-- ✅ Детали проекта
-
-## 🎯 Как тестировать:
-
-1. **Лента проектов**: Главный экран → скролль вниз
-2. **Профиль**: Нажми на иконку профиля внизу
-3. **Поиск**: Нажми на иконку поиска → введи запрос
-4. **Сообщения**: Нажми на иконку сообщений → выбери чат
-5. **Проект**: Нажми на карточку проекта → детали
-
-## 📞 Если нужна помощь:
-
-Проверь консоль VS Code на ошибки или запусти:
+Проверьте, что backend сервер работает:
 ```bash
-flutter analyze    # Проверка кода
-flutter doctor     # Диагностика
+curl https://student-connect-backend.onrender.com/
 ```
+
+Если сервер спит, подождите 30-50 секунд и попробуйте снова.
+
+### Google Fonts не загружаются
+
+Это не критично - приложение будет использовать системные шрифты. Проверьте интернет-соединение на устройстве.
+
+---
+
+## 🎯 Тестирование функционала
+
+1. **Регистрация:** Создайте новый аккаунт
+2. **Лента:** Просмотрите посты других пользователей
+3. **Создание поста:** Нажмите "+" → добавьте фото и текст
+4. **Проекты:** Создайте проект с описанием и технологиями
+5. **Чаты:** Найдите пользователя и напишите сообщение
+6. **Профиль:** Отредактируйте свой профиль
+
+---
+
+## 📞 Дополнительная информация
+
+- **Полная инструкция:** [SETUP_GUIDE.md](SETUP_GUIDE.md)
+- **Гайд для AI:** [GUIDEFORAI.md](GUIDEFORAI.md)
+- **GitHub:** https://github.com/Mustafa-java/student-connect-app
+- **Backend Dashboard:** https://dashboard.render.com/web/srv-d8csddt7vvec73ckovt0
 
 ---
 
