@@ -1,0 +1,31 @@
+﻿Launching lib\main.dart on 2210132C in debug mode...
+Running Gradle task 'assembleDebug'...                           2┬а874ms
+тИЪ Built build\app\outputs\flutter-apk\app-debug.apk
+Installing build\app\outputs\flutter-apk\app-debug.apk...           4,1s
+D/FlutterJNI(  927): Beginning load of flutter...
+D/FlutterJNI(  927): flutter (null) was loaded normally!
+I/flutter (  927): [IMPORTANT:flutter/shell/platform/android/android_context_vk_impeller.cc(62)] Using the Impeller rendering backend (Vulkan).
+D/FlutterRenderer(  927): Width is zero. 0,0
+D/FlutterRenderer(  927): Width is zero. 0,0
+D/FlutterJNI(  927): Sending viewport metrics to the engine.
+W/student_connect(  927): Binder 0xb400007898d87be0 destroyed after setInheritRt before being parceled.
+D/FlutterJNI(  927): Sending viewport metrics to the engine.
+Syncing files to device 2210132C...                             
+I/flutter (  927): тЬЕ Firebase ╨╕╨╜╨╕╤Ж╨╕╨░╨╗╨╕╨╖╨╕╤А╨╛╨▓╨░╨╜
+Syncing files to device 2210132C...                                 66ms
+
+Flutter run key commands.
+r Hot reload. 
+R Hot restart.
+h List all available interactive commands.
+d Detach (terminate "flutter run" but leave application running).
+c Clear the screen
+q Quit (terminate the application on the device).
+
+A Dart VM Service on 2210132C is available at: http://127.0.0.1:63732/qB9d0Gq02bU=/
+The Flutter DevTools debugger and profiler on 2210132C is available at: http://127.0.0.1:63732/qB9d0Gq02bU=/devtools/?uri=ws://127.0.0.1:63732/qB9d0Gq02bU=/ws
+D/WmSystemUiDebug(  927): set navigation bar color,Alpha=1.0, RGB:18,18,18 caller:io.flutter.plugin.platform.PlatformPlugin.setSystemChromeSystemUIOverlayStyle:514 io.flutter.plugin.platform.PlatformPlugin.access$700:36 io.flutter.plugin.platform.PlatformPlugin$1.setSystemUiOverlayStyle:123 io.flutter.embedding.engine.systemchannels.PlatformChannel$1.onMethodCall:130 io.flutter.plugin.common.MethodChannel$IncomingMethodCallHandler.onMessage:267 io.flutter.embedding.engine.dart.DartMessenger.invokeHandler:286 io.flutter.embedding.engine.dart.DartMessenger.lambda$dispatchMessageToQueue$0$io-flutter-embedding-engine-dart-DartMessenger:313 io.flutter.embedding.engine.dart.DartMessenger$$ExternalSyntheticLambda0.run:0 android.os.Handler.handleCallback:1029 android.os.Handler.dispatchMessage:107 
+I/Choreographer(  927): Skipped 116 frames!  The application may be doing too much work on its main thread.
+D/FlutterJNI(  927): Sending viewport metrics to the engine.
+D/WmSystemUiDebug(  927): set navigation bar color,Alpha=1.0, RGB:0,0,0 caller:io.flutter.plugin.platform.PlatformPlugin.setSystemChromeSystemUIOverlayStyle:514 io.flutter.plugin.platform.PlatformPlugin.access$700:36 io.flutter.plugin.platform.PlatformPlugin$1.setSystemUiOverlayStyle:123 io.flutter.embedding.engine.systemchannels.PlatformChannel$1.onMethodCall:130 io.flutter.plugin.common.MethodChannel$IncomingMethodCallHandler.onMessage:267 io.flutter.embedding.engine.dart.DartMessenger.invokeHandler:286 io.flutter.embedding.engine.dart.DartMessenger.lambda$dispatchMessageToQueue$0$io-flutter-embedding-engine-dart-DartMessenger:313 io.flutter.embedding.engine.dart.DartMessenger$$ExternalSyntheticLambda0.run:0 android.os.Handler.handleCallback:1029 android.os.Handler.dispatchMessage:107 
+Lost connection to device.
