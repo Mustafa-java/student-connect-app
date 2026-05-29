@@ -10,8 +10,8 @@ class ApiService {
   ApiService._privateConstructor();
   static final ApiService instance = ApiService._privateConstructor();
 
-  // Для физического устройства: IP компьютера в локальной сети
-  static const String _baseUrl = 'http://192.168.100.2:3000';
+  // Облачный сервер на Render.com
+  static const String _baseUrl = 'https://student-connect-backend.onrender.com';
   static const String _tokenKey = 'api_token';
   static const String _userIdKey = 'api_user_id';
 
