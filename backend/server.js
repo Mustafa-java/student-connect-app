@@ -84,6 +84,24 @@ function authMiddleware(req, res, next) {
 function sanitizeUser(u) { if (!u) return null; const { password_hash, ...r } = u; return r; }
 function esc(s) { return (s || '').replace(/'/g, "''"); }
 
+// ==================== ROOT ====================
+
+app.get('/', (req, res) => {
+  res.json({
+    name: 'Student Connect API',
+    version: '1.0.0',
+    status: 'running',
+    endpoints: {
+      auth: '/api/auth/*',
+      users: '/api/users',
+      posts: '/api/posts',
+      projects: '/api/projects',
+      chats: '/api/chats',
+      messages: '/api/chats/:id/messages'
+    }
+  });
+});
+
 // ==================== AUTH ====================
 
 app.post('/api/auth/register', async (req, res) => {
