@@ -6,7 +6,7 @@ const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const { getDb, saveDb } = require('./database');
+const { pool, initDatabase } = require('./database');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -30,7 +30,6 @@ const upload = multer({
   storage,
   limits: { fileSize: 50 * 1024 * 1024 }, // 50MB max
   fileFilter: (req, file, cb) => {
-    // Принимаем только ZIP и архивы
     const allowed = ['.zip', '.rar', '.7z', '.tar', '.gz'];
     const ext = path.extname(file.originalname).toLowerCase();
     if (allowed.includes(ext) || file.mimetype.includes('zip') || file.mimetype.includes('archive')) {
@@ -41,19 +40,6 @@ const upload = multer({
   }
 });
 
-// Helpers
-function rowToObject(columns, values) {
-  const o = {}; columns.forEach((c, i) => o[c] = values[i]); return o;
-}
-function querySingle(db, sql) {
-  const r = db.exec(sql);
-  return (r.length && r[0].values.length) ? rowToObject(r[0].columns, r[0].values[0]) : null;
-}
-function queryAll(db, sql) {
-  const r = db.exec(sql);
-  return (r.length && r[0].values.length) ? r[0].values.map(v => rowToObject(r[0].columns, v)) : [];
-}
-
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -62,34 +48,36 @@ app.use(cors({
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Логирование запросов для отладки
+// Логирование запросов
 app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
-  next();
-});
-
-// Auto-save after each request
-app.use((req, res, next) => {
-  res.on('finish', () => { try { saveDb(); } catch(e) {} });
   next();
 });
 
 function authMiddleware(req, res, next) {
   const token = req.headers.authorization?.replace('Bearer ', '');
   if (!token) return res.status(401).json({ error: 'Не авторизован' });
-  try { req.userId = jwt.verify(token, JWT_SECRET).userId; next(); }
-  catch (e) { res.status(401).json({ error: 'Неверный токен' }); }
+  try {
+    req.userId = jwt.verify(token, JWT_SECRET).userId;
+    next();
+  } catch (e) {
+    res.status(401).json({ error: 'Неверный токен' });
+  }
 }
 
-function sanitizeUser(u) { if (!u) return null; const { password_hash, ...r } = u; return r; }
-function esc(s) { return (s || '').replace(/'/g, "''"); }
+function sanitizeUser(u) {
+  if (!u) return null;
+  const { password_hash, ...r } = u;
+  return r;
+}
 
 // ==================== ROOT ====================
 
 app.get('/', (req, res) => {
   res.json({
     name: 'Student Connect API',
-    version: '1.0.0',
+    version: '2.0.0',
+    database: 'PostgreSQL',
     status: 'running',
     endpoints: {
       auth: '/api/auth/*',
@@ -106,182 +94,259 @@ app.get('/', (req, res) => {
 
 app.post('/api/auth/register', async (req, res) => {
   try {
-    const db = await getDb();
     const { name, email, password, university, faculty, course, bio, skills, avatar_url } = req.body;
-    if (!name || !email || !password) return res.status(400).json({ error: 'name, email, password обязательны' });
+    if (!name || !email || !password) {
+      return res.status(400).json({ error: 'name, email, password обязательны' });
+    }
 
-    const existing = db.exec(`SELECT id FROM users WHERE email = '${esc(email)}'`);
-    if (existing.length && existing[0].values.length) return res.status(409).json({ error: 'Email уже занят' });
+    const existing = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+    if (existing.rows.length > 0) {
+      return res.status(409).json({ error: 'Email уже занят' });
+    }
 
     const hash = await bcrypt.hash(password, 10);
     const uid = uuidv4();
-    db.run(`INSERT INTO users (id, name, email, password_hash, avatar_url, bio, university, faculty, course, skills)
-      VALUES (?,?,?,?,?,?,?,?,?,?)`,
-      [uid, name, email, hash, avatar_url||null, bio||null, university||null, faculty||null, course||null, JSON.stringify(skills||[])]);
+
+    await pool.query(
+      `INSERT INTO users (id, name, email, password_hash, avatar_url, bio, university, faculty, course, skills)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [uid, name, email, hash, avatar_url || null, bio || null, university || null, faculty || null, course || null, JSON.stringify(skills || [])]
+    );
 
     const token = jwt.sign({ userId: uid }, JWT_SECRET, { expiresIn: '30d' });
-    const user = querySingle(db, `SELECT * FROM users WHERE id = '${uid}'`);
-    res.status(201).json({ token, user: sanitizeUser(user) });
-  } catch(e) { console.error(e); res.status(500).json({ error: 'Ошибка' }); }
+    const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [uid]);
+    res.status(201).json({ token, user: sanitizeUser(userResult.rows[0]) });
+  } catch(e) {
+    console.error('Register error:', e);
+    res.status(500).json({ error: 'Ошибка регистрации' });
+  }
 });
 
 app.post('/api/auth/login', async (req, res) => {
   try {
     console.log('Login attempt:', req.body.email);
-    const db = await getDb();
     const { email, password } = req.body;
-    
+
     if (!email || !password) {
       console.log('Missing email or password');
       return res.status(400).json({ error: 'Email и пароль обязательны' });
     }
-    
-    const user = querySingle(db, `SELECT * FROM users WHERE email = '${esc(email)}'`);
-    if (!user) {
+
+    const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    if (result.rows.length === 0) {
       console.log('User not found:', email);
       return res.status(401).json({ error: 'Неверный email или пароль' });
     }
-    
+
+    const user = result.rows[0];
     console.log('User found:', user.name);
+
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) {
       console.log('Invalid password for user:', email);
       return res.status(401).json({ error: 'Неверный email или пароль' });
     }
-    
-    db.run(`UPDATE users SET is_online = 1, last_seen = ? WHERE id = ?`, [Date.now(), user.id]);
+
+    await pool.query('UPDATE users SET is_online = 1, last_seen = $1 WHERE id = $2', [Date.now(), user.id]);
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '30d' });
     console.log('Login successful for:', user.name);
     res.json({ token, user: sanitizeUser(user) });
-  } catch(e) { 
-    console.error('Login error:', e); 
-    res.status(500).json({ error: 'Ошибка сервера: ' + e.message }); 
+  } catch(e) {
+    console.error('Login error:', e);
+    res.status(500).json({ error: 'Ошибка сервера: ' + e.message });
   }
 });
 
 app.get('/api/auth/me', authMiddleware, async (req, res) => {
-  const db = await getDb();
-  const user = querySingle(db, `SELECT * FROM users WHERE id = '${req.userId}'`);
-  if (!user) return res.status(404).json({ error: 'Не найден' });
-  res.json({ user: sanitizeUser(user) });
+  try {
+    const result = await pool.query('SELECT * FROM users WHERE id = $1', [req.userId]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Не найден' });
+    }
+    res.json({ user: sanitizeUser(result.rows[0]) });
+  } catch(e) {
+    res.status(500).json({ error: 'Ошибка' });
+  }
 });
 
 // ==================== USERS ====================
 
 app.get('/api/users', authMiddleware, async (req, res) => {
-  const db = await getDb();
-  const users = queryAll(db, 'SELECT * FROM users ORDER BY created_at DESC LIMIT 100').map(sanitizeUser);
-  res.json({ users });
+  try {
+    const result = await pool.query('SELECT * FROM users ORDER BY created_at DESC LIMIT 100');
+    res.json({ users: result.rows.map(sanitizeUser) });
+  } catch(e) {
+    res.status(500).json({ error: 'Ошибка' });
+  }
 });
 
 app.get('/api/users/search', authMiddleware, async (req, res) => {
-  const { q } = req.query;
-  if (!q) return res.json({ users: [] });
-  const db = await getDb();
-  const users = queryAll(db, `SELECT * FROM users WHERE name LIKE '%${esc(q)}%' AND id != '${req.userId}' ORDER BY name LIMIT 20`).map(sanitizeUser);
-  res.json({ users });
+  try {
+    const { q } = req.query;
+    if (!q) return res.json({ users: [] });
+
+    const result = await pool.query(
+      'SELECT * FROM users WHERE name ILIKE $1 AND id != $2 ORDER BY name LIMIT 20',
+      [`%${q}%`, req.userId]
+    );
+    res.json({ users: result.rows.map(sanitizeUser) });
+  } catch(e) {
+    res.status(500).json({ error: 'Ошибка' });
+  }
 });
 
 app.get('/api/users/:id', authMiddleware, async (req, res) => {
-  const db = await getDb();
-  const user = querySingle(db, `SELECT * FROM users WHERE id = '${req.params.id}'`);
-  if (!user) return res.status(404).json({ error: 'Не найден' });
-  res.json({ user: sanitizeUser(user) });
+  try {
+    const result = await pool.query('SELECT * FROM users WHERE id = $1', [req.params.id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Не найден' });
+    }
+    res.json({ user: sanitizeUser(result.rows[0]) });
+  } catch(e) {
+    res.status(500).json({ error: 'Ошибка' });
+  }
 });
 
 app.put('/api/users/:id', authMiddleware, async (req, res) => {
-  if (req.params.id !== req.userId) return res.status(403).json({ error: 'Нет доступа' });
-  const db = await getDb();
-  const { name, bio, university, faculty, course, skills, avatar_url } = req.body;
-  db.run(`UPDATE users SET name=COALESCE(?,name), bio=COALESCE(?,bio), university=COALESCE(?,university),
-    faculty=COALESCE(?,faculty), course=COALESCE(?,course), skills=COALESCE(?,skills), avatar_url=COALESCE(?,avatar_url)
-    WHERE id=?`, [name||null, bio||null, university||null, faculty||null, course||null, skills?JSON.stringify(skills):null, avatar_url||null, req.userId]);
-  const user = querySingle(db, `SELECT * FROM users WHERE id = '${req.userId}'`);
-  res.json({ user: sanitizeUser(user) });
+  try {
+    if (req.params.id !== req.userId) {
+      return res.status(403).json({ error: 'Нет доступа' });
+    }
+
+    const { name, bio, university, faculty, course, skills, avatar_url } = req.body;
+
+    await pool.query(
+      `UPDATE users SET
+        name = COALESCE($1, name),
+        bio = COALESCE($2, bio),
+        university = COALESCE($3, university),
+        faculty = COALESCE($4, faculty),
+        course = COALESCE($5, course),
+        skills = COALESCE($6, skills),
+        avatar_url = COALESCE($7, avatar_url)
+      WHERE id = $8`,
+      [name || null, bio || null, university || null, faculty || null, course || null,
+       skills ? JSON.stringify(skills) : null, avatar_url || null, req.userId]
+    );
+
+    const result = await pool.query('SELECT * FROM users WHERE id = $1', [req.userId]);
+    res.json({ user: sanitizeUser(result.rows[0]) });
+  } catch(e) {
+    res.status(500).json({ error: 'Ошибка' });
+  }
 });
 
 // ==================== POSTS ====================
 
-function enrichPost(db, post, userId) {
-  return { ...post, author_skills: JSON.parse(post.author_skills||'[]'),
-    is_liked: !!db.exec(`SELECT 1 FROM post_likes WHERE post_id='${post.id}' AND user_id='${userId}'`).length };
+async function enrichPost(postId, userId) {
+  const likeResult = await pool.query(
+    'SELECT 1 FROM post_likes WHERE post_id = $1 AND user_id = $2',
+    [postId, userId]
+  );
+  return likeResult.rows.length > 0;
 }
 
 app.get('/api/posts', authMiddleware, async (req, res) => {
   try {
-    const db = await getDb();
-    const posts = queryAll(db, `
+    const result = await pool.query(`
       SELECT p.*, u.name as author_name, u.email as author_email, u.avatar_url as author_avatar,
              u.university as author_university, u.is_online as author_is_online,
              u.skills as author_skills, u.projects_count as author_projects_count,
              u.followers_count as author_followers_count, u.following_count as author_following_count
-      FROM posts p JOIN users u ON p.author_id = u.id ORDER BY p.created_at DESC LIMIT 50`);
-    res.json({ posts: posts.map(p => enrichPost(db, p, req.userId)) });
-  } catch(e) { res.status(500).json({ error: 'Ошибка' }); }
+      FROM posts p JOIN users u ON p.author_id = u.id
+      ORDER BY p.created_at DESC LIMIT 50
+    `);
+
+    const posts = await Promise.all(result.rows.map(async (p) => ({
+      ...p,
+      author_skills: JSON.parse(p.author_skills || '[]'),
+      is_liked: await enrichPost(p.id, req.userId)
+    })));
+
+    res.json({ posts });
+  } catch(e) {
+    console.error('Get posts error:', e);
+    res.status(500).json({ error: 'Ошибка' });
+  }
 });
 
 app.post('/api/posts', authMiddleware, async (req, res) => {
   try {
-    const db = await getDb();
     const { content, project_id, images, tags } = req.body;
     const id = uuidv4();
-    db.run(`INSERT INTO posts (id, author_id, content, project_id, images, tags) VALUES (?,?,?,?,?,?)`,
-      [id, req.userId, content||null, project_id||null, JSON.stringify(images||[]), JSON.stringify(tags||[])]);
-    const post = querySingle(db, `
+
+    await pool.query(
+      'INSERT INTO posts (id, author_id, content, project_id, images, tags) VALUES ($1, $2, $3, $4, $5, $6)',
+      [id, req.userId, content || null, project_id || null, JSON.stringify(images || []), JSON.stringify(tags || [])]
+    );
+
+    const result = await pool.query(`
       SELECT p.*, u.name as author_name, u.email as author_email, u.avatar_url as author_avatar,
              u.university as author_university, u.is_online as author_is_online,
              u.skills as author_skills, u.projects_count as author_projects_count,
              u.followers_count as author_followers_count, u.following_count as author_following_count
-      FROM posts p JOIN users u ON p.author_id = u.id WHERE p.id = '${id}'`);
-    res.status(201).json({ post: enrichPost(db, post, req.userId) });
-  } catch(e) { res.status(500).json({ error: 'Ошибка' }); }
+      FROM posts p JOIN users u ON p.author_id = u.id WHERE p.id = $1
+    `, [id]);
+
+    const post = result.rows[0];
+    post.author_skills = JSON.parse(post.author_skills || '[]');
+    post.is_liked = await enrichPost(post.id, req.userId);
+
+    res.status(201).json({ post });
+  } catch(e) {
+    console.error('Create post error:', e);
+    res.status(500).json({ error: 'Ошибка' });
+  }
 });
 
 app.post('/api/posts/:id/like', authMiddleware, async (req, res) => {
   try {
-    const db = await getDb();
     const { id } = req.params;
-    const exists = db.exec(`SELECT 1 FROM post_likes WHERE post_id='${id}' AND user_id='${req.userId}'`);
-    if (exists.length && exists[0].values.length) {
-      db.run(`DELETE FROM post_likes WHERE post_id=? AND user_id=?`, [id, req.userId]);
-      db.run(`UPDATE posts SET likes_count=MAX(0,likes_count-1) WHERE id=?`, [id]);
+    const likeCheck = await pool.query(
+      'SELECT 1 FROM post_likes WHERE post_id = $1 AND user_id = $2',
+      [id, req.userId]
+    );
+
+    if (likeCheck.rows.length > 0) {
+      await pool.query('DELETE FROM post_likes WHERE post_id = $1 AND user_id = $2', [id, req.userId]);
+      await pool.query('UPDATE posts SET likes_count = GREATEST(0, likes_count - 1) WHERE id = $1', [id]);
     } else {
-      db.run(`INSERT INTO post_likes (post_id,user_id) VALUES (?,?)`, [id, req.userId]);
-      db.run(`UPDATE posts SET likes_count=likes_count+1 WHERE id=?`, [id]);
+      await pool.query('INSERT INTO post_likes (post_id, user_id) VALUES ($1, $2)', [id, req.userId]);
+      await pool.query('UPDATE posts SET likes_count = likes_count + 1 WHERE id = $1', [id]);
     }
-    const r = querySingle(db, `SELECT likes_count FROM posts WHERE id='${id}'`);
-    const isLiked = !!(db.exec(`SELECT 1 FROM post_likes WHERE post_id='${id}' AND user_id='${req.userId}'`).length);
-    res.json({ is_liked: isLiked, likes_count: r?.likes_count || 0 });
-  } catch(e) { res.status(500).json({ error: 'Ошибка' }); }
+
+    const result = await pool.query('SELECT likes_count FROM posts WHERE id = $1', [id]);
+    const isLiked = await enrichPost(id, req.userId);
+
+    res.json({ is_liked: isLiked, likes_count: result.rows[0]?.likes_count || 0 });
+  } catch(e) {
+    console.error('Like post error:', e);
+    res.status(500).json({ error: 'Ошибка' });
+  }
 });
 
-// Удаление поста
 app.delete('/api/posts/:id', authMiddleware, async (req, res) => {
   try {
-    const db = await getDb();
     const { id } = req.params;
-    const post = querySingle(db, `SELECT * FROM posts WHERE id='${id}'`);
-    
-    if (!post) {
+    const postResult = await pool.query('SELECT * FROM posts WHERE id = $1', [id]);
+
+    if (postResult.rows.length === 0) {
       return res.status(404).json({ error: 'Пост не найден' });
     }
-    
-    if (post.author_id !== req.userId) {
+
+    if (postResult.rows[0].author_id !== req.userId) {
       return res.status(403).json({ error: 'Нет доступа' });
     }
-    
-    // Удаляем лайки
-    db.run(`DELETE FROM post_likes WHERE post_id=?`, [id]);
-    // Удаляем комментарии
-    db.run(`DELETE FROM comments WHERE post_id=?`, [id]);
-    // Удаляем пост
-    db.run(`DELETE FROM posts WHERE id=?`, [id]);
-    
+
+    await pool.query('DELETE FROM post_likes WHERE post_id = $1', [id]);
+    await pool.query('DELETE FROM comments WHERE post_id = $1', [id]);
+    await pool.query('DELETE FROM posts WHERE id = $1', [id]);
+
     console.log('Post deleted:', id);
     res.json({ ok: true });
-  } catch(e) { 
-    console.error('Delete post error:', e); 
-    res.status(500).json({ error: 'Ошибка' }); 
+  } catch(e) {
+    console.error('Delete post error:', e);
+    res.status(500).json({ error: 'Ошибка' });
   }
 });
 
@@ -289,114 +354,171 @@ app.delete('/api/posts/:id', authMiddleware, async (req, res) => {
 
 app.get('/api/posts/:id/comments', authMiddleware, async (req, res) => {
   try {
-    const db = await getDb();
-    const comments = queryAll(db, `
+    const result = await pool.query(`
       SELECT c.*, u.name as author_name, u.email as author_email, u.avatar_url as author_avatar,
              u.is_online as author_is_online
-      FROM comments c JOIN users u ON c.author_id = u.id WHERE c.post_id='${req.params.id}' ORDER BY c.created_at ASC`);
-    res.json({ comments });
-  } catch(e) { res.status(500).json({ error: 'Ошибка' }); }
+      FROM comments c JOIN users u ON c.author_id = u.id
+      WHERE c.post_id = $1 ORDER BY c.created_at ASC
+    `, [req.params.id]);
+
+    res.json({ comments: result.rows });
+  } catch(e) {
+    console.error('Get comments error:', e);
+    res.status(500).json({ error: 'Ошибка' });
+  }
 });
 
 app.post('/api/posts/:id/comments', authMiddleware, async (req, res) => {
   try {
-    const db = await getDb();
     const { content, reply_to_id } = req.body;
-    if (!content) return res.status(400).json({ error: 'content обязателен' });
+    if (!content) {
+      return res.status(400).json({ error: 'content обязателен' });
+    }
+
     const id = uuidv4();
-    db.run(`INSERT INTO comments (id, post_id, author_id, content, reply_to_id) VALUES (?,?,?,?,?)`,
-      [id, req.params.id, req.userId, content, reply_to_id||null]);
-    db.run(`UPDATE posts SET comments_count=comments_count+1 WHERE id=?`, [req.params.id]);
-    const comment = querySingle(db, `
+    await pool.query(
+      'INSERT INTO comments (id, post_id, author_id, content, reply_to_id) VALUES ($1, $2, $3, $4, $5)',
+      [id, req.params.id, req.userId, content, reply_to_id || null]
+    );
+
+    await pool.query('UPDATE posts SET comments_count = comments_count + 1 WHERE id = $1', [req.params.id]);
+
+    const result = await pool.query(`
       SELECT c.*, u.name as author_name, u.email as author_email, u.avatar_url as author_avatar,
              u.is_online as author_is_online
-      FROM comments c JOIN users u ON c.author_id = u.id WHERE c.id='${id}'`);
-    res.status(201).json({ comment });
-  } catch(e) { res.status(500).json({ error: 'Ошибка' }); }
+      FROM comments c JOIN users u ON c.author_id = u.id WHERE c.id = $1
+    `, [id]);
+
+    res.status(201).json({ comment: result.rows[0] });
+  } catch(e) {
+    console.error('Create comment error:', e);
+    res.status(500).json({ error: 'Ошибка' });
+  }
 });
 
 // ==================== PROJECTS ====================
 
-function enrichProject(db, p, userId) {
-  return { ...p, author_skills: JSON.parse(p.author_skills||'[]'), team_members: JSON.parse(p.team_members||'[]'),
-    is_liked: !!db.exec(`SELECT 1 FROM project_likes WHERE project_id='${p.id}' AND user_id='${userId}'`).length };
+async function enrichProject(projectId, userId) {
+  const likeResult = await pool.query(
+    'SELECT 1 FROM project_likes WHERE project_id = $1 AND user_id = $2',
+    [projectId, userId]
+  );
+  return likeResult.rows.length > 0;
 }
 
 app.get('/api/projects', authMiddleware, async (req, res) => {
   try {
-    const db = await getDb();
-    const projects = queryAll(db, `
+    const result = await pool.query(`
       SELECT p.*, u.name as author_name, u.email as author_email, u.avatar_url as author_avatar,
              u.university as author_university, u.is_online as author_is_online,
              u.skills as author_skills, u.projects_count as author_projects_count,
              u.followers_count as author_followers_count, u.following_count as author_following_count
-      FROM projects p JOIN users u ON p.author_id = u.id ORDER BY p.created_at DESC LIMIT 50`);
-    res.json({ projects: projects.map(p => enrichProject(db, p, req.userId)) });
-  } catch(e) { res.status(500).json({ error: 'Ошибка' }); }
+      FROM projects p JOIN users u ON p.author_id = u.id
+      ORDER BY p.created_at DESC LIMIT 50
+    `);
+
+    const projects = await Promise.all(result.rows.map(async (p) => ({
+      ...p,
+      author_skills: JSON.parse(p.author_skills || '[]'),
+      team_members: JSON.parse(p.team_members || '[]'),
+      is_liked: await enrichProject(p.id, req.userId)
+    })));
+
+    res.json({ projects });
+  } catch(e) {
+    console.error('Get projects error:', e);
+    res.status(500).json({ error: 'Ошибка' });
+  }
 });
 
 app.post('/api/projects', authMiddleware, async (req, res) => {
   try {
-    const db = await getDb();
     const { title, description, images, skills, status, university_tags } = req.body;
-    if (!title || !description) return res.status(400).json({ error: 'title и description обязательны' });
+    if (!title || !description) {
+      return res.status(400).json({ error: 'title и description обязательны' });
+    }
+
     const id = uuidv4();
-    db.run(`INSERT INTO projects (id,author_id,title,description,images,skills,status,university_tags)
-      VALUES (?,?,?,?,?,?,?,?)`, [id, req.userId, title, description, JSON.stringify(images||[]),
-      JSON.stringify(skills||[]), status||'idea', JSON.stringify(university_tags||[])]);
-    db.run(`UPDATE users SET projects_count=projects_count+1 WHERE id=?`, [req.userId]);
-    const project = querySingle(db, `
+    await pool.query(
+      `INSERT INTO projects (id, author_id, title, description, images, skills, status, university_tags)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [id, req.userId, title, description, JSON.stringify(images || []),
+       JSON.stringify(skills || []), status || 'idea', JSON.stringify(university_tags || [])]
+    );
+
+    await pool.query('UPDATE users SET projects_count = projects_count + 1 WHERE id = $1', [req.userId]);
+
+    const result = await pool.query(`
       SELECT p.*, u.name as author_name, u.email as author_email, u.avatar_url as author_avatar,
              u.university as author_university, u.is_online as author_is_online,
              u.skills as author_skills, u.projects_count as author_projects_count,
              u.followers_count as author_followers_count, u.following_count as author_following_count
-      FROM projects p JOIN users u ON p.author_id = u.id WHERE p.id='${id}'`);
-    res.status(201).json({ project: enrichProject(db, project, req.userId) });
-  } catch(e) { res.status(500).json({ error: 'Ошибка' }); }
+      FROM projects p JOIN users u ON p.author_id = u.id WHERE p.id = $1
+    `, [id]);
+
+    const project = result.rows[0];
+    project.author_skills = JSON.parse(project.author_skills || '[]');
+    project.team_members = JSON.parse(project.team_members || '[]');
+    project.is_liked = await enrichProject(project.id, req.userId);
+
+    res.status(201).json({ project });
+  } catch(e) {
+    console.error('Create project error:', e);
+    res.status(500).json({ error: 'Ошибка' });
+  }
 });
 
 app.post('/api/projects/:id/views', authMiddleware, async (req, res) => {
-  const db = await getDb();
-  db.run(`UPDATE projects SET views_count=views_count+1 WHERE id=?`, [req.params.id]);
-  res.json({ ok: true });
+  try {
+    await pool.query('UPDATE projects SET views_count = views_count + 1 WHERE id = $1', [req.params.id]);
+    res.json({ ok: true });
+  } catch(e) {
+    res.status(500).json({ error: 'Ошибка' });
+  }
 });
 
 app.post('/api/projects/:id/like', authMiddleware, async (req, res) => {
   try {
-    const db = await getDb();
     const { id } = req.params;
-    const exists = db.exec(`SELECT 1 FROM project_likes WHERE project_id='${id}' AND user_id='${req.userId}'`);
-    if (exists.length && exists[0].values.length) {
-      db.run(`DELETE FROM project_likes WHERE project_id=? AND user_id=?`, [id, req.userId]);
-      db.run(`UPDATE projects SET likes_count=MAX(0,likes_count-1) WHERE id=?`, [id]);
+    const likeCheck = await pool.query(
+      'SELECT 1 FROM project_likes WHERE project_id = $1 AND user_id = $2',
+      [id, req.userId]
+    );
+
+    if (likeCheck.rows.length > 0) {
+      await pool.query('DELETE FROM project_likes WHERE project_id = $1 AND user_id = $2', [id, req.userId]);
+      await pool.query('UPDATE projects SET likes_count = GREATEST(0, likes_count - 1) WHERE id = $1', [id]);
     } else {
-      db.run(`INSERT INTO project_likes (project_id,user_id) VALUES (?,?)`, [id, req.userId]);
-      db.run(`UPDATE projects SET likes_count=likes_count+1 WHERE id=?`, [id]);
+      await pool.query('INSERT INTO project_likes (project_id, user_id) VALUES ($1, $2)', [id, req.userId]);
+      await pool.query('UPDATE projects SET likes_count = likes_count + 1 WHERE id = $1', [id]);
     }
-    const r = querySingle(db, `SELECT likes_count FROM projects WHERE id='${id}'`);
-    const isLiked = !!(db.exec(`SELECT 1 FROM project_likes WHERE project_id='${id}' AND user_id='${req.userId}'`).length);
-    res.json({ is_liked: isLiked, likes_count: r?.likes_count || 0 });
-  } catch(e) { res.status(500).json({ error: 'Ошибка' }); }
+
+    const result = await pool.query('SELECT likes_count FROM projects WHERE id = $1', [id]);
+    const isLiked = await enrichProject(id, req.userId);
+
+    res.json({ is_liked: isLiked, likes_count: result.rows[0]?.likes_count || 0 });
+  } catch(e) {
+    console.error('Like project error:', e);
+    res.status(500).json({ error: 'Ошибка' });
+  }
 });
 
-// Удаление проекта
 app.delete('/api/projects/:id', authMiddleware, async (req, res) => {
   try {
-    const db = await getDb();
     const { id } = req.params;
-    const project = querySingle(db, `SELECT * FROM projects WHERE id='${id}'`);
-    
-    if (!project) {
+    const projectResult = await pool.query('SELECT * FROM projects WHERE id = $1', [id]);
+
+    if (projectResult.rows.length === 0) {
       return res.status(404).json({ error: 'Проект не найден' });
     }
-    
+
+    const project = projectResult.rows[0];
     if (project.author_id !== req.userId) {
       return res.status(403).json({ error: 'Нет доступа' });
     }
-    
-    // Удаляем лайки
-    db.run(`DELETE FROM project_likes WHERE project_id=?`, [id]);
-    // Удаляем файл с диска если есть
+
+    await pool.query('DELETE FROM project_likes WHERE project_id = $1', [id]);
+
     if (project.zip_file_disk_name) {
       const filePath = path.join(UPLOADS_DIR, project.zip_file_disk_name);
       if (fs.existsSync(filePath)) {
@@ -404,34 +526,40 @@ app.delete('/api/projects/:id', authMiddleware, async (req, res) => {
         console.log('Deleted file:', filePath);
       }
     }
-    // Удаляем проект
-    db.run(`DELETE FROM projects WHERE id=?`, [id]);
-    
+
+    await pool.query('DELETE FROM projects WHERE id = $1', [id]);
+
     console.log('Project deleted:', id);
     res.json({ ok: true });
-  } catch(e) { 
-    console.error('Delete project error:', e); 
-    res.status(500).json({ error: 'Ошибка' }); 
+  } catch(e) {
+    console.error('Delete project error:', e);
+    res.status(500).json({ error: 'Ошибка' });
   }
 });
 
 // ==================== PROJECT ZIP FILES ====================
 
-// Загрузка ZIP файла проекта
 app.post('/api/projects/:id/upload-zip', authMiddleware, upload.single('file'), async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ error: 'Файл не загружен' });
+    if (!req.file) {
+      return res.status(400).json({ error: 'Файл не загружен' });
+    }
 
-    const db = await getDb();
     const { id } = req.params;
-    const project = querySingle(db, `SELECT * FROM projects WHERE id='${id}'`);
-    if (!project) return res.status(404).json({ error: 'Проект не найден' });
-    if (project.author_id !== req.userId) return res.status(403).json({ error: 'Нет доступа' });
+    const projectResult = await pool.query('SELECT * FROM projects WHERE id = $1', [id]);
+
+    if (projectResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Проект не найден' });
+    }
+
+    if (projectResult.rows[0].author_id !== req.userId) {
+      return res.status(403).json({ error: 'Нет доступа' });
+    }
 
     const zipUrl = `/api/projects/${id}/zip-file`;
-    const zipName = req.file.originalname; // Оригинальное имя для отображения
+    const zipName = req.file.originalname;
     const zipSize = req.file.size;
-    const zipFileNameOnDisk = req.file.filename; // Уникальное имя файла на диске
+    const zipFileNameOnDisk = req.file.filename;
 
     console.log('Uploaded file:', {
       originalName: zipName,
@@ -439,8 +567,10 @@ app.post('/api/projects/:id/upload-zip', authMiddleware, upload.single('file'), 
       size: zipSize
     });
 
-    db.run(`UPDATE projects SET zip_file_url=?, zip_file_name=?, zip_file_size=?, zip_file_disk_name=? WHERE id=?`,
-      [zipUrl, zipName, zipSize, zipFileNameOnDisk, id]);
+    await pool.query(
+      'UPDATE projects SET zip_file_url = $1, zip_file_name = $2, zip_file_size = $3, zip_file_disk_name = $4 WHERE id = $5',
+      [zipUrl, zipName, zipSize, zipFileNameOnDisk, id]
+    );
 
     res.json({
       zip_file_url: zipUrl,
@@ -448,35 +578,33 @@ app.post('/api/projects/:id/upload-zip', authMiddleware, upload.single('file'), 
       zip_file_size: zipSize
     });
   } catch(e) {
-    console.error(e);
+    console.error('Upload zip error:', e);
     res.status(500).json({ error: 'Ошибка загрузки файла' });
   }
 });
 
-// Скачивание ZIP файла проекта
 app.get('/api/projects/:id/zip-file', authMiddleware, async (req, res) => {
   try {
     console.log('Download request for project:', req.params.id);
-    const db = await getDb();
     const { id } = req.params;
-    const project = querySingle(db, `SELECT * FROM projects WHERE id='${id}'`);
-    
-    if (!project) {
+    const projectResult = await pool.query('SELECT * FROM projects WHERE id = $1', [id]);
+
+    if (projectResult.rows.length === 0) {
       console.log('Project not found:', id);
       return res.status(404).json({ error: 'Проект не найден' });
     }
 
+    const project = projectResult.rows[0];
     if (!project.zip_file_url || !project.zip_file_name) {
       console.log('No zip file attached for project:', id);
       return res.status(404).json({ error: 'ZIP файл не прикреплён' });
     }
 
-    // Используем уникальное имя файла на диске
     const zipFileName = project.zip_file_disk_name || project.zip_file_name;
     const filePath = path.join(UPLOADS_DIR, zipFileName);
-    
+
     console.log('Looking for file:', zipFileName);
-    
+
     if (!fs.existsSync(filePath)) {
       console.log('File not found on disk:', filePath);
       return res.status(404).json({ error: 'Файл не найден на сервере' });
@@ -486,11 +614,10 @@ app.get('/api/projects/:id/zip-file', authMiddleware, async (req, res) => {
     console.log('Found file:', zipFileName, 'Size:', fileStats.size, 'bytes');
     console.log('Original name:', project.zip_file_name);
 
-    // Отправляем файл с правильными заголовками
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(project.zip_file_name)}"`);
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Length', fileStats.size);
-    
+
     const fileStream = fs.createReadStream(filePath);
     fileStream.pipe(res);
   } catch(e) {
@@ -503,142 +630,277 @@ app.get('/api/projects/:id/zip-file', authMiddleware, async (req, res) => {
 
 app.get('/api/chats', authMiddleware, async (req, res) => {
   try {
-    const db = await getDb();
-    const pattern = `%"${req.userId}"%`;
-    const chatRows = db.exec(`SELECT * FROM chats WHERE participant_ids LIKE '${esc(pattern)}' ORDER BY last_message_at DESC`);
-    if (!chatRows.length || !chatRows[0].values.length) return res.json({ chats: [] });
+    const result = await pool.query(
+      `SELECT * FROM chats WHERE participant_ids LIKE $1 ORDER BY last_message_at DESC`,
+      [`%"${req.userId}"%`]
+    );
 
     const chats = [];
-    for (const v of chatRows[0].values) {
-      const chat = rowToObject(chatRows[0].columns, v);
+    for (const chat of result.rows) {
       const participants = JSON.parse(chat.participant_ids);
       const otherId = participants.find(x => x !== req.userId);
-      const otherUser = sanitizeUser(querySingle(db, `SELECT * FROM users WHERE id='${otherId}'`));
-      const unreadRow = db.exec(`SELECT unread_count FROM chat_unread WHERE chat_id='${chat.id}' AND user_id='${req.userId}'`);
-      const unread = unreadRow.length && unreadRow[0].values.length ? unreadRow[0].values[0][0] : 0;
+
+      const otherUserResult = await pool.query('SELECT * FROM users WHERE id = $1', [otherId]);
+      const otherUser = sanitizeUser(otherUserResult.rows[0]);
+
+      const unreadResult = await pool.query(
+        'SELECT unread_count FROM chat_unread WHERE chat_id = $1 AND user_id = $2',
+        [chat.id, req.userId]
+      );
+      const unread = unreadResult.rows.length > 0 ? unreadResult.rows[0].unread_count : 0;
 
       let lastMessage = null;
       if (chat.last_sender_id) {
-        const sender = sanitizeUser(querySingle(db, `SELECT id,name,email,avatar_url,is_online FROM users WHERE id='${chat.last_sender_id}'`));
-        lastMessage = { id: chat.id+'_last', chat_id: chat.id, sender, content: chat.last_message, type: chat.last_message_type, created_at: chat.last_message_at };
+        const senderResult = await pool.query(
+          'SELECT id, name, email, avatar_url, is_online FROM users WHERE id = $1',
+          [chat.last_sender_id]
+        );
+        const sender = sanitizeUser(senderResult.rows[0]);
+        lastMessage = {
+          id: chat.id + '_last',
+          chat_id: chat.id,
+          sender,
+          content: chat.last_message,
+          type: chat.last_message_type,
+          created_at: chat.last_message_at
+        };
       }
 
-      chats.push({ id: chat.id, other_user: otherUser, last_message: lastMessage,
-        unread_count: unread, is_online: otherUser?.is_online||false, last_message_at: chat.last_message_at, created_at: chat.created_at });
+      chats.push({
+        id: chat.id,
+        other_user: otherUser,
+        last_message: lastMessage,
+        unread_count: unread,
+        is_online: otherUser?.is_online || false,
+        last_message_at: chat.last_message_at,
+        created_at: chat.created_at
+      });
     }
+
     res.json({ chats });
-  } catch(e) { console.error(e); res.status(500).json({ error: 'Ошибка' }); }
+  } catch(e) {
+    console.error('Get chats error:', e);
+    res.status(500).json({ error: 'Ошибка' });
+  }
 });
 
 app.post('/api/chats', authMiddleware, async (req, res) => {
   try {
-    const db = await getDb();
     const { other_user_id } = req.body;
-    if (!other_user_id) return res.status(400).json({ error: 'other_user_id обязателен' });
+    if (!other_user_id) {
+      return res.status(400).json({ error: 'other_user_id обязателен' });
+    }
+
     const pids = [req.userId, other_user_id].sort();
     const pidsJson = JSON.stringify(pids);
-    const existing = querySingle(db, `SELECT * FROM chats WHERE participant_ids = '${esc(pidsJson)}'`);
-    if (existing) return res.json({ chat_id: existing.id, created: false });
+
+    const existingResult = await pool.query(
+      'SELECT * FROM chats WHERE participant_ids = $1',
+      [pidsJson]
+    );
+
+    if (existingResult.rows.length > 0) {
+      return res.json({ chat_id: existingResult.rows[0].id, created: false });
+    }
 
     const chatId = uuidv4();
-    db.run(`INSERT INTO chats (id, participant_ids) VALUES (?,?)`, [chatId, pidsJson]);
-    db.run(`INSERT INTO chat_unread (chat_id, user_id, unread_count) VALUES (?,?,0)`, [chatId, req.userId]);
-    db.run(`INSERT INTO chat_unread (chat_id, user_id, unread_count) VALUES (?,?,0)`, [chatId, other_user_id]);
+    await pool.query('INSERT INTO chats (id, participant_ids) VALUES ($1, $2)', [chatId, pidsJson]);
+    await pool.query('INSERT INTO chat_unread (chat_id, user_id, unread_count) VALUES ($1, $2, 0)', [chatId, req.userId]);
+    await pool.query('INSERT INTO chat_unread (chat_id, user_id, unread_count) VALUES ($1, $2, 0)', [chatId, other_user_id]);
+
     res.status(201).json({ chat_id: chatId, created: true });
-  } catch(e) { res.status(500).json({ error: 'Ошибка' }); }
+  } catch(e) {
+    console.error('Create chat error:', e);
+    res.status(500).json({ error: 'Ошибка' });
+  }
 });
 
 app.get('/api/chats/:id/messages', authMiddleware, async (req, res) => {
   try {
-    const db = await getDb();
-    const chat = querySingle(db, `SELECT * FROM chats WHERE id='${req.params.id}'`);
-    if (!chat) return res.status(404).json({ error: 'Чат не найден' });
-    if (!JSON.parse(chat.participant_ids).includes(req.userId)) return res.status(403).json({ error: 'Нет доступа' });
+    const chatResult = await pool.query('SELECT * FROM chats WHERE id = $1', [req.params.id]);
 
-    const messages = queryAll(db, `
+    if (chatResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Чат не найден' });
+    }
+
+    const chat = chatResult.rows[0];
+    const participants = JSON.parse(chat.participant_ids);
+    if (!participants.includes(req.userId)) {
+      return res.status(403).json({ error: 'Нет доступа' });
+    }
+
+    const messagesResult = await pool.query(`
       SELECT m.*, u.name as sender_name, u.email as sender_email, u.avatar_url as sender_avatar,
              u.is_online as sender_is_online
-      FROM messages m JOIN users u ON m.sender_id = u.id WHERE m.chat_id='${req.params.id}'
-      ORDER BY m.created_at DESC LIMIT 100`);
-    res.json({ messages });
-  } catch(e) { res.status(500).json({ error: 'Ошибка' }); }
+      FROM messages m JOIN users u ON m.sender_id = u.id
+      WHERE m.chat_id = $1
+      ORDER BY m.created_at DESC LIMIT 100
+    `, [req.params.id]);
+
+    res.json({ messages: messagesResult.rows });
+  } catch(e) {
+    console.error('Get messages error:', e);
+    res.status(500).json({ error: 'Ошибка' });
+  }
 });
 
 app.post('/api/chats/:id/messages', authMiddleware, async (req, res) => {
   try {
-    const db = await getDb();
     const { content, type, attachments, project_id } = req.body;
-    if (!content) return res.status(400).json({ error: 'content обязателен' });
-    const chat = querySingle(db, `SELECT * FROM chats WHERE id='${req.params.id}'`);
-    if (!chat) return res.status(404).json({ error: 'Чат не найден' });
+    if (!content) {
+      return res.status(400).json({ error: 'content обязателен' });
+    }
+
+    const chatResult = await pool.query('SELECT * FROM chats WHERE id = $1', [req.params.id]);
+    if (chatResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Чат не найден' });
+    }
+
+    const chat = chatResult.rows[0];
     const participants = JSON.parse(chat.participant_ids);
-    if (!participants.includes(req.userId)) return res.status(403).json({ error: 'Нет доступа' });
+    if (!participants.includes(req.userId)) {
+      return res.status(403).json({ error: 'Нет доступа' });
+    }
 
     const msgId = uuidv4();
     const receiverId = participants.find(x => x !== req.userId);
-    db.run(`INSERT INTO messages (id,chat_id,sender_id,content,type,attachments,project_id) VALUES (?,?,?,?,?,?,?)`,
-      [msgId, req.params.id, req.userId, content, type||'text', JSON.stringify(attachments||[]), project_id||null]);
-    db.run(`UPDATE chats SET last_message=?, last_message_type=?, last_sender_id=?, last_message_at=? WHERE id=?`,
-      [content, type||'text', req.userId, Date.now(), req.params.id]);
-    db.run(`UPDATE chat_unread SET unread_count=unread_count+1 WHERE chat_id=? AND user_id=?`, [req.params.id, receiverId]);
 
-    const sender = sanitizeUser(querySingle(db, `SELECT id,name,email,avatar_url,is_online FROM users WHERE id='${req.userId}'`));
-    res.status(201).json({ message: { id: msgId, chat_id: req.params.id, sender, content, type: type||'text', is_read: false, created_at: Date.now() } });
-  } catch(e) { res.status(500).json({ error: 'Ошибка' }); }
+    await pool.query(
+      'INSERT INTO messages (id, chat_id, sender_id, content, type, attachments, project_id) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+      [msgId, req.params.id, req.userId, content, type || 'text', JSON.stringify(attachments || []), project_id || null]
+    );
+
+    await pool.query(
+      'UPDATE chats SET last_message = $1, last_message_type = $2, last_sender_id = $3, last_message_at = $4 WHERE id = $5',
+      [content, type || 'text', req.userId, Date.now(), req.params.id]
+    );
+
+    await pool.query(
+      'UPDATE chat_unread SET unread_count = unread_count + 1 WHERE chat_id = $1 AND user_id = $2',
+      [req.params.id, receiverId]
+    );
+
+    const senderResult = await pool.query(
+      'SELECT id, name, email, avatar_url, is_online FROM users WHERE id = $1',
+      [req.userId]
+    );
+    const sender = sanitizeUser(senderResult.rows[0]);
+
+    res.status(201).json({
+      message: {
+        id: msgId,
+        chat_id: req.params.id,
+        sender,
+        content,
+        type: type || 'text',
+        is_read: false,
+        created_at: Date.now()
+      }
+    });
+  } catch(e) {
+    console.error('Send message error:', e);
+    res.status(500).json({ error: 'Ошибка' });
+  }
 });
 
 app.post('/api/chats/:id/read', authMiddleware, async (req, res) => {
-  const db = await getDb();
-  db.run(`UPDATE chat_unread SET unread_count=0 WHERE chat_id=? AND user_id=?`, [req.params.id, req.userId]);
-  db.run(`UPDATE messages SET is_read=1, read_at=? WHERE chat_id=? AND sender_id!=? AND is_read=0`, [Date.now(), req.params.id, req.userId]);
-  res.json({ ok: true });
+  try {
+    await pool.query(
+      'UPDATE chat_unread SET unread_count = 0 WHERE chat_id = $1 AND user_id = $2',
+      [req.params.id, req.userId]
+    );
+
+    await pool.query(
+      'UPDATE messages SET is_read = 1, read_at = $1 WHERE chat_id = $2 AND sender_id != $3 AND is_read = 0',
+      [Date.now(), req.params.id, req.userId]
+    );
+
+    res.json({ ok: true });
+  } catch(e) {
+    console.error('Mark read error:', e);
+    res.status(500).json({ error: 'Ошибка' });
+  }
 });
 
 // ==================== FOLLOWS ====================
 
 app.post('/api/follow/:userId', authMiddleware, async (req, res) => {
   try {
-    const db = await getDb();
-    const { userId: fid } = req;
+    const fid = req.userId;
     const tid = req.params.userId;
-    if (fid === tid) return res.status(400).json({ error: 'Нельзя на себя' });
 
-    const exists = db.exec(`SELECT 1 FROM follows WHERE follower_id='${fid}' AND following_id='${tid}'`);
-    if (exists.length && exists[0].values.length) {
-      db.run(`DELETE FROM follows WHERE follower_id=? AND following_id=?`, [fid, tid]);
-      db.run(`UPDATE users SET following_count=MAX(0,following_count-1) WHERE id=?`, [fid]);
-      db.run(`UPDATE users SET followers_count=MAX(0,followers_count-1) WHERE id=?`, [tid]);
+    if (fid === tid) {
+      return res.status(400).json({ error: 'Нельзя на себя' });
+    }
+
+    const existsResult = await pool.query(
+      'SELECT 1 FROM follows WHERE follower_id = $1 AND following_id = $2',
+      [fid, tid]
+    );
+
+    if (existsResult.rows.length > 0) {
+      await pool.query('DELETE FROM follows WHERE follower_id = $1 AND following_id = $2', [fid, tid]);
+      await pool.query('UPDATE users SET following_count = GREATEST(0, following_count - 1) WHERE id = $1', [fid]);
+      await pool.query('UPDATE users SET followers_count = GREATEST(0, followers_count - 1) WHERE id = $1', [tid]);
       res.json({ is_following: false });
     } else {
-      db.run(`INSERT INTO follows (follower_id, following_id) VALUES (?,?)`, [fid, tid]);
-      db.run(`UPDATE users SET following_count=following_count+1 WHERE id=?`, [fid]);
-      db.run(`UPDATE users SET followers_count=followers_count+1 WHERE id=?`, [tid]);
+      await pool.query('INSERT INTO follows (follower_id, following_id) VALUES ($1, $2)', [fid, tid]);
+      await pool.query('UPDATE users SET following_count = following_count + 1 WHERE id = $1', [fid]);
+      await pool.query('UPDATE users SET followers_count = followers_count + 1 WHERE id = $1', [tid]);
       res.json({ is_following: true });
     }
-  } catch(e) { res.status(500).json({ error: 'Ошибка' }); }
+  } catch(e) {
+    console.error('Follow error:', e);
+    res.status(500).json({ error: 'Ошибка' });
+  }
 });
 
 app.get('/api/follow/status/:userId', authMiddleware, async (req, res) => {
-  const db = await getDb();
-  const r = db.exec(`SELECT 1 FROM follows WHERE follower_id='${req.userId}' AND following_id='${req.params.userId}'`);
-  res.json({ is_following: !!(r.length && r[0].values.length) });
+  try {
+    const result = await pool.query(
+      'SELECT 1 FROM follows WHERE follower_id = $1 AND following_id = $2',
+      [req.userId, req.params.userId]
+    );
+    res.json({ is_following: result.rows.length > 0 });
+  } catch(e) {
+    res.status(500).json({ error: 'Ошибка' });
+  }
 });
 
 app.get('/api/followers/:userId', authMiddleware, async (req, res) => {
-  const db = await getDb();
-  const followers = queryAll(db, `SELECT u.* FROM follows f JOIN users u ON f.follower_id=u.id WHERE f.following_id='${req.params.userId}' ORDER BY f.followed_at DESC`).map(sanitizeUser);
-  res.json({ followers });
+  try {
+    const result = await pool.query(`
+      SELECT u.* FROM follows f
+      JOIN users u ON f.follower_id = u.id
+      WHERE f.following_id = $1
+      ORDER BY f.followed_at DESC
+    `, [req.params.userId]);
+
+    res.json({ followers: result.rows.map(sanitizeUser) });
+  } catch(e) {
+    console.error('Get followers error:', e);
+    res.status(500).json({ error: 'Ошибка' });
+  }
 });
 
 app.get('/api/following/:userId', authMiddleware, async (req, res) => {
-  const db = await getDb();
-  const following = queryAll(db, `SELECT u.* FROM follows f JOIN users u ON f.following_id=u.id WHERE f.follower_id='${req.params.userId}' ORDER BY f.followed_at DESC`).map(sanitizeUser);
-  res.json({ following });
+  try {
+    const result = await pool.query(`
+      SELECT u.* FROM follows f
+      JOIN users u ON f.following_id = u.id
+      WHERE f.follower_id = $1
+      ORDER BY f.followed_at DESC
+    `, [req.params.userId]);
+
+    res.json({ following: result.rows.map(sanitizeUser) });
+  } catch(e) {
+    console.error('Get following error:', e);
+    res.status(500).json({ error: 'Ошибка' });
+  }
 });
 
 // ==================== START ====================
 
-// Global error handler
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err);
   res.status(500).json({ error: 'Внутренняя ошибка сервера' });
@@ -646,10 +908,10 @@ app.use((err, req, res, next) => {
 
 async function start() {
   try {
-    await getDb();
-    console.log('Database initialized');
+    await initDatabase();
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Backend: http://localhost:${PORT}`);
+      console.log(`📡 Database: PostgreSQL`);
       console.log(`📡 Listening on all interfaces`);
     });
   } catch (e) {
