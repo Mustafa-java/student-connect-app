@@ -13,6 +13,6 @@
 Дизайн максимально приближен к Instagram (расстановка элементов, навигация, карточки, анимации).
 
 **Текущая версия:** Только Android + Русский язык  
-**Стек:** Flutter (frontend), NestJS + PostgreSQL (backend — в разработке)
+**Стек:** Flutter (frontend), Node.js + PostgreSQL (backend)
 
 ### Структура проекта

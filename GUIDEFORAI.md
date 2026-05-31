@@ -57,7 +57,7 @@
 └──────────────┬───────────────────────┘
                │
 ┌──────────────▼───────────────────────┐
-│  SQLite Database (sql.js)            │
+│  PostgreSQL Database                 │
 │  - Users, Posts, Projects            │
 │  - Messages, Chats                   │
 │  - Likes, Comments, Follows          │
@@ -78,12 +78,13 @@
 
 **Backend (Node.js):**
 - `express` - Web framework
-- `sql.js` - SQLite database
+- `pg` - PostgreSQL database
 - `bcrypt` - Password hashing
 - `jsonwebtoken` - JWT auth
 - `multer` - File uploads
 - `cors` - CORS handling
 - `uuid` - ID generation
+- `dotenv` - Environment variables
 
 ---
 
@@ -186,12 +187,16 @@ lib/
 ```
 backend/
 ├── server.js               # Express сервер + все API эндпоинты
-├── database.js             # SQLite инициализация и схема
+├── database.js             # PostgreSQL инициализация и схема
+├── migrate-sqlite-to-postgres.js  # Скрипт миграции данных
 ├── package.json            # Node.js зависимости
 ├── package-lock.json       # Lockfile
-├── student_connect.db      # SQLite база (не в git)
+├── .env                    # Переменные окружения (не в git)
+├── .env.example            # Пример конфигурации
+├── student_connect.db      # Старая SQLite база (не в git)
 ├── uploads/                # Загруженные файлы (не в git)
 ├── .gitignore              # Git ignore
+├── MIGRATION.md            # Документация миграции
 └── README.md               # Backend документация
 ```
 
@@ -392,10 +397,10 @@ static const String _baseUrl = 'https://student-connect-backend.onrender.com';
 
 ### 3. База данных
 
-- **Тип:** SQLite (sql.js)
-- **Файл:** `backend/student_connect.db`
-- **Хранение:** На сервере Render (персистентное)
-- **Бэкап:** Нет автоматического бэкапа на бесплатном плане
+- **Тип:** PostgreSQL
+- **Хостинг:** Render.com (Managed PostgreSQL)
+- **Хранение:** Персистентное на сервере Render
+- **Бэкап:** Автоматический на платных планах
 
 **Важно:** База данных НЕ в git (.gitignore)
 
@@ -469,7 +474,7 @@ npm start                               # Запустить
 
 ### Технические улучшения
 
-- [ ] Миграция с SQLite на PostgreSQL
+- [x] Миграция с SQLite на PostgreSQL ✅
 - [ ] WebSocket для real-time чата
 - [ ] Redis для кэширования
 - [ ] Unit и integration тесты
@@ -507,7 +512,7 @@ npm start                               # Запустить
 - Flutter + Dart для мобильной разработки
 - Riverpod для state management
 - Node.js + Express для backend
-- SQLite для базы данных
+- PostgreSQL для базы данных
 - JWT для аутентификации
 - Render.com для облачного хостинга
 - Material Design 3 для UI/UX
@@ -557,9 +562,10 @@ npm start                               # Запустить
 ### При работе с backend:
 
 1. **Проверяй, что сервер работает** перед изменениями
-2. **Не меняй схему БД** без миграции
+2. **Используй параметризованные запросы** ($1, $2) для PostgreSQL
 3. **Сохраняй обратную совместимость** API
 4. **Добавляй логирование** для отладки
+5. **Проверяй DATABASE_URL** в переменных окружения
 
 ### При деплое:
 
@@ -572,4 +578,4 @@ npm start                               # Запустить
 
 **Готово! Теперь ты знаешь все о проекте Student Connect! 🚀**
 
-*Последнее обновление: 2026-05-30*
+*Последнее обновление: 2026-05-31 (Миграция на PostgreSQL завершена)*

@@ -4,14 +4,35 @@ Backend API для мобильного приложения Student Connect.
 
 ## Технологии
 - Node.js + Express
-- SQLite (sql.js)
+- PostgreSQL (pg)
 - JWT Authentication
 - Multer для загрузки файлов
+- dotenv для переменных окружения
 
 ## Установка
 
 ```bash
 npm install
+```
+
+## Настройка
+
+1. Создайте файл `.env` на основе `.env.example`:
+```bash
+cp .env.example .env
+```
+
+2. Настройте PostgreSQL и обновите `DATABASE_URL` в `.env`:
+```env
+DATABASE_URL=postgresql://username:password@localhost:5432/student_connect
+JWT_SECRET=student-connect-secret-key-2026
+NODE_ENV=development
+PORT=3000
+```
+
+3. Создайте базу данных PostgreSQL:
+```bash
+createdb student_connect
 ```
 
 ## Запуск
@@ -21,6 +42,17 @@ npm start
 ```
 
 Сервер запустится на порту 3000 (или PORT из переменных окружения).
+При первом запуске автоматически создастся схема базы данных.
+
+## Миграция данных
+
+Если у вас есть данные в SQLite (`student_connect.db`), выполните миграцию:
+
+```bash
+npm run migrate
+```
+
+Подробнее см. [MIGRATION.md](./MIGRATION.md)
 
 ## API Endpoints
 
