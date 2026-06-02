@@ -42,6 +42,28 @@ const upload = multer({
   }
 });
 
+// Настройка multer для изображений постов
+const imageStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, UPLOADS_DIR),
+  filename: (req, file, cb) => {
+    const uniqueName = `post_${Date.now()}-${uuidv4()}${path.extname(file.originalname)}`;
+    cb(null, uniqueName);
+  }
+});
+const uploadImages = multer({
+  storage: imageStorage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max per image
+  fileFilter: (req, file, cb) => {
+    const allowed = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (allowed.includes(ext) || file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Только изображения'));
+    }
+  }
+});
+
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -49,6 +71,9 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// Раздавать статические файлы из uploads/
+app.use('/uploads', express.static(UPLOADS_DIR));
 
 // Логирование запросов
 app.use((req, res, next) => {
@@ -272,14 +297,27 @@ app.get('/api/posts', authMiddleware, async (req, res) => {
   }
 });
 
-app.post('/api/posts', authMiddleware, async (req, res) => {
+app.post('/api/posts', authMiddleware, uploadImages.array('images', 5), async (req, res) => {
   try {
-    const { content, project_id, images, tags } = req.body;
+    const { content, project_id, tags } = req.body;
     const id = uuidv4();
+
+    // Получаем URL загруженных изображений
+    const imageUrls = req.files ? req.files.map(file => `/uploads/${file.filename}`) : [];
+
+    // Парсим tags если это строка
+    let tagsArray = [];
+    if (tags) {
+      try {
+        tagsArray = typeof tags === 'string' ? JSON.parse(tags) : tags;
+      } catch (e) {
+        tagsArray = [];
+      }
+    }
 
     await pool.query(
       'INSERT INTO posts (id, author_id, content, project_id, images, tags) VALUES ($1, $2, $3, $4, $5, $6)',
-      [id, req.userId, content || null, project_id || null, JSON.stringify(images || []), JSON.stringify(tags || [])]
+      [id, req.userId, content || null, project_id || null, JSON.stringify(imageUrls), JSON.stringify(tagsArray)]
     );
 
     const result = await pool.query(`
@@ -294,10 +332,11 @@ app.post('/api/posts', authMiddleware, async (req, res) => {
     post.author_skills = JSON.parse(post.author_skills || '[]');
     post.is_liked = await enrichPost(post.id, req.userId);
 
+    console.log('Post created with images:', imageUrls);
     res.status(201).json({ post });
   } catch(e) {
     console.error('Create post error:', e);
-    res.status(500).json({ error: 'Ошибка' });
+    res.status(500).json({ error: 'Ошибка создания поста' });
   }
 });
 
@@ -433,19 +472,42 @@ app.get('/api/projects', authMiddleware, async (req, res) => {
   }
 });
 
-app.post('/api/projects', authMiddleware, async (req, res) => {
+app.post('/api/projects', authMiddleware, uploadImages.array('images', 5), async (req, res) => {
   try {
-    const { title, description, images, skills, status, university_tags } = req.body;
+    const { title, description, skills, status, university_tags } = req.body;
     if (!title || !description) {
       return res.status(400).json({ error: 'title и description обязательны' });
     }
 
     const id = uuidv4();
+
+    // Получаем URL загруженных изображений
+    const imageUrls = req.files ? req.files.map(file => `/uploads/${file.filename}`) : [];
+
+    // Парсим массивы если это строки
+    let skillsArray = [];
+    if (skills) {
+      try {
+        skillsArray = typeof skills === 'string' ? JSON.parse(skills) : skills;
+      } catch (e) {
+        skillsArray = [];
+      }
+    }
+
+    let universityTagsArray = [];
+    if (university_tags) {
+      try {
+        universityTagsArray = typeof university_tags === 'string' ? JSON.parse(university_tags) : university_tags;
+      } catch (e) {
+        universityTagsArray = [];
+      }
+    }
+
     await pool.query(
       `INSERT INTO projects (id, author_id, title, description, images, skills, status, university_tags)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [id, req.userId, title, description, JSON.stringify(images || []),
-       JSON.stringify(skills || []), status || 'idea', JSON.stringify(university_tags || [])]
+      [id, req.userId, title, description, JSON.stringify(imageUrls),
+       JSON.stringify(skillsArray), status || 'idea', JSON.stringify(universityTagsArray)]
     );
 
     await pool.query('UPDATE users SET projects_count = projects_count + 1 WHERE id = $1', [req.userId]);
@@ -463,10 +525,11 @@ app.post('/api/projects', authMiddleware, async (req, res) => {
     project.team_members = JSON.parse(project.team_members || '[]');
     project.is_liked = await enrichProject(project.id, req.userId);
 
+    console.log('Project created with images:', imageUrls);
     res.status(201).json({ project });
   } catch(e) {
     console.error('Create project error:', e);
-    res.status(500).json({ error: 'Ошибка' });
+    res.status(500).json({ error: 'Ошибка создания проекта' });
   }
 });
 
