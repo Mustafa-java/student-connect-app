@@ -226,6 +226,8 @@ class Chat extends Equatable {
         return '📎 Файл';
       case MessageType.project:
         return '📁 ${lastMessage!.sharedProject?.title ?? "Проект"}';
+      case MessageType.post:
+        return '📝 Пост';
       case MessageType.system:
         return lastMessage!.content;
     }
