@@ -15,6 +15,7 @@ import '../../services/api_service.dart';
 import '../common/image_viewer_screen.dart';
 import '../common/comments_bottom_sheet.dart';
 import '../common/project_download_dialog.dart';
+import '../common/share_to_chat_screen.dart';
 import '../profile/other_user_profile_screen.dart';
 import '../messages/chat_screen.dart';
 import '../../core/utils/page_transitions.dart';
@@ -1433,6 +1434,79 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
   }
 
   void _shareProject() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surfaceDark,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(top: 10, bottom: 16),
+              decoration: BoxDecoration(
+                color: AppColors.textDarkSecondary.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.chat_bubble_outline),
+              title: const Text('Отправить в чате'),
+              onTap: () {
+                Navigator.pop(context);
+                _shareInApp();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.share_outlined),
+              title: const Text('Поделиться вне приложения'),
+              onTap: () {
+                Navigator.pop(context);
+                _shareExternal();
+              },
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _shareInApp() {
+    final descriptionPreview = _project.description.length > 150
+        ? '${_project.description.substring(0, 150)}...'
+        : _project.description;
+
+    final skills = _project.skills.take(5).join(', ');
+
+    final shareText = '''
+📌 ${_project.title}
+
+Автор: ${_project.author.name}
+
+$descriptionPreview
+
+Технологии: $skills
+
+👍 ${_project.likesCount} | 💬 ${_project.commentsCount} | 👁 ${_project.viewsCount}
+''';
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ShareToChatScreen(
+          shareText: shareText,
+          shareTitle: _project.title,
+        ),
+      ),
+    );
+  }
+
+  void _shareExternal() {
     final descriptionPreview = _project.description.length > 150
         ? '${_project.description.substring(0, 150)}...'
         : _project.description;

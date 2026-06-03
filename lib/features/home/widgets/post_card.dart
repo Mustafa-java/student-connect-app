@@ -9,6 +9,7 @@ import '../../../core/widgets/custom_avatar.dart';
 import '../../../core/widgets/smart_image.dart';
 import '../../../features/common/image_viewer_screen.dart';
 import '../../../features/common/comments_bottom_sheet.dart';
+import '../../../features/common/share_to_chat_screen.dart';
 import '../../../features/profile/other_user_profile_screen.dart';
 import '../../../features/profile/profile_screen.dart';
 import '../../../providers/app_providers.dart';
@@ -708,6 +709,74 @@ class _PostCardState extends State<PostCard>
   }
 
   void _sharePost() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surfaceDark,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(top: 10, bottom: 16),
+              decoration: BoxDecoration(
+                color: AppColors.textDarkSecondary.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.chat_bubble_outline),
+              title: const Text('Отправить в чате'),
+              onTap: () {
+                Navigator.pop(context);
+                _shareInApp();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.share_outlined),
+              title: const Text('Поделиться вне приложения'),
+              onTap: () {
+                Navigator.pop(context);
+                _shareExternal();
+              },
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _shareInApp() {
+    final content = widget.post.content ?? '';
+    final contentPreview = content.length > 100
+        ? '${content.substring(0, 100)}...'
+        : content;
+
+    final shareText = '''
+📝 Пост от ${widget.post.author.name}
+
+${contentPreview.isNotEmpty ? contentPreview : 'Без текста'}
+
+👍 ${widget.post.likesCount} | 💬 ${widget.post.commentsCount}
+''';
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ShareToChatScreen(
+          shareText: shareText,
+          shareTitle: 'Пост от ${widget.post.author.name}',
+        ),
+      ),
+    );
+  }
+
+  void _shareExternal() {
     final content = widget.post.content ?? '';
     final contentPreview = content.length > 100
         ? '${content.substring(0, 100)}...'
