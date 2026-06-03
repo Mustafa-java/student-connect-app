@@ -621,6 +621,32 @@ class ApiService {
     }
   }
 
+  // Project Comments
+  Future<List<Comment>> getProjectComments(String projectId) async {
+    try {
+      final response = await _dio.get('/api/projects/$projectId/comments');
+      final data = response.data as Map<String, dynamic>;
+      return (data['comments'] as List)
+          .map((c) => _parseComment(c as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      return [];
+    }
+  }
+
+  Future<Comment> addProjectComment({
+    required String projectId,
+    required String content,
+    String? replyToCommentId,
+  }) async {
+    final response = await _dio.post('/api/projects/$projectId/comments', data: {
+      'content': content,
+      if (replyToCommentId != null) 'reply_to_id': replyToCommentId,
+    });
+    final data = response.data as Map<String, dynamic>;
+    return _parseComment(data['comment'] as Map<String, dynamic>);
+  }
+
   /// ==================== CHATS ====================
 
   Future<List<Map<String, dynamic>>> getChats() async {

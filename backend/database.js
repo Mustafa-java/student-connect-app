@@ -165,6 +165,19 @@ async function initDatabase() {
       )
     `);
 
+    // Project comments table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS project_comments (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL,
+        author_id TEXT NOT NULL,
+        content TEXT NOT NULL,
+        reply_to_id TEXT,
+        likes_count INTEGER DEFAULT 0,
+        created_at BIGINT DEFAULT EXTRACT(EPOCH FROM NOW()) * 1000
+      )
+    `);
+
     console.log('✅ Database schema initialized successfully');
   } catch (error) {
     console.error('❌ Error initializing database:', error);

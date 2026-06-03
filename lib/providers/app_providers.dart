@@ -528,6 +528,56 @@ class PostCommentsNotifier extends StateNotifier<List<Comment>> {
   }
 }
 
+// ==================== PROJECT COMMENTS ====================
+
+final projectCommentsProvider =
+    StateNotifierProvider.family<ProjectCommentsNotifier, List<Comment>, String>(
+  (ref, projectId) => ProjectCommentsNotifier(projectId),
+);
+
+class ProjectCommentsNotifier extends StateNotifier<List<Comment>> {
+  final String projectId;
+  ProjectCommentsNotifier(this.projectId) : super([]) {
+    _loadComments();
+  }
+
+  Future<void> _loadComments() async {
+    try {
+      final comments = await ApiService.instance.getProjectComments(projectId);
+      state = comments;
+    } catch (e) {
+      debugPrint('ProjectCommentsNotifier load error: $e');
+    }
+  }
+
+  Future<void> addComment(String content) async {
+    try {
+      final comment = await ApiService.instance.addProjectComment(
+        projectId: projectId, content: content,
+      );
+      state = [...state, comment];
+    } catch (e) {
+      debugPrint('addProjectComment error: $e');
+    }
+  }
+
+  void toggleLike(int index) {
+    // TODO: Implement comment likes via API
+    final comments = List<Comment>.from(state);
+    final c = comments[index];
+    comments[index] = Comment(
+      id: c.id, author: c.author, content: c.content,
+      likesCount: c.isLiked ? c.likesCount - 1 : c.likesCount + 1,
+      isLiked: !c.isLiked, createdAt: c.createdAt,
+    );
+    state = comments;
+  }
+
+  void deleteComment(int index) {
+    state = [...state]..removeAt(index);
+  }
+}
+
 // ==================== FOLLOW ====================
 
 final followStatusProvider =

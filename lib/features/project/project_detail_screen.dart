@@ -15,51 +15,8 @@ import '../common/image_viewer_screen.dart';
 import '../common/comments_bottom_sheet.dart';
 import '../common/project_download_dialog.dart';
 import '../profile/other_user_profile_screen.dart';
-
-/// Провайдер комментариев для проектов
-final projectCommentsProvider =
-    StateNotifierProvider.family<ProjectCommentsNotifier, List<Comment>, String>(
-  (ref, projectId) {
-    return ProjectCommentsNotifier(projectId);
-  },
-);
-
-class ProjectCommentsNotifier extends StateNotifier<List<Comment>> {
-  final String projectId;
-
-  ProjectCommentsNotifier(this.projectId) : super([]) {
-    _loadComments();
-  }
-
-  Future<void> _loadComments() async {
-    // TODO: API для комментариев проектов пока нет
-    state = [];
-  }
-
-  Future<void> addComment(String content, User author) async {
-    final newComment = Comment(
-      id: 'cmt_proj_${DateTime.now().millisecondsSinceEpoch}',
-      author: author, content: content,
-      likesCount: 0, isLiked: false, createdAt: DateTime.now(),
-    );
-    state = [...state, newComment];
-    // TODO: API для комментариев проектов пока нет
-  }
-
-  Future<void> toggleLike(int index) async {
-    final comments = List<Comment>.from(state);
-    final comment = comments[index];
-    comments[index] = comment.copyWith(
-      isLiked: !comment.isLiked,
-      likesCount: comment.isLiked ? comment.likesCount - 1 : comment.likesCount + 1,
-    );
-    state = comments;
-  }
-
-  Future<void> deleteComment(int index) async {
-    state = [...state]..removeAt(index);
-  }
-}
+import '../messages/chat_screen.dart';
+import '../../core/utils/page_transitions.dart';
 
 /// Экран детального просмотра проекта — стиль Instagram 2025 (как PostDetailScreen)
 class ProjectDetailScreen extends ConsumerStatefulWidget {
@@ -212,8 +169,8 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     final currentUser = ref.read(currentUserProvider);
     if (currentUser == null) return;
 
-    // Добавляем комментарий локально
-    ref.read(projectCommentsProvider(widget.project.id).notifier).addComment(text, currentUser);
+    // Добавляем комментарий через API
+    ref.read(projectCommentsProvider(widget.project.id).notifier).addComment(text);
 
     _commentController.clear();
 
@@ -1025,9 +982,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                   IconButton(
                     icon: const Icon(Icons.chat_outlined, size: 22),
                     color: AppColors.primary,
-                    onPressed: () {
-                      // TODO: открыть чат
-                    },
+                    onPressed: () => _openChatWithAuthor(context, ref),
                   ),
                 ],
               ),
@@ -1455,5 +1410,60 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'
     ];
     return months[m - 1];
+  }
+
+  Future<void> _openChatWithAuthor(BuildContext context, WidgetRef ref) async {
+    final currentUser = ref.read(currentUserProvider);
+    if (currentUser == null) return;
+
+    // Не открываем чат с самим собой
+    if (widget.project.author.id == currentUser.id) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Это ваш проект'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    try {
+      // Создаём или получаем существующий чат
+      final chatId = await ApiService.instance.createChat(widget.project.author.id);
+      final chats = await ApiService.instance.getChats();
+      final chatData = chats.firstWhere(
+        (c) => c['id'] == chatId,
+        orElse: () => <String, dynamic>{},
+      );
+
+      if (chatData.isNotEmpty && context.mounted) {
+        final chat = Chat(
+          id: chatData['id'] as String,
+          currentUser: widget.project.author,
+          unreadCount: chatData['unread_count'] as int? ?? 0,
+          isOnline: (chatData['is_online'] as int?) == 1,
+          lastMessageAt: chatData['last_message_at'] != null
+              ? DateTime.fromMillisecondsSinceEpoch(chatData['last_message_at'])
+              : null,
+          createdAt: chatData['created_at'] != null
+              ? DateTime.fromMillisecondsSinceEpoch(chatData['created_at'])
+              : DateTime.now(),
+        );
+
+        Navigator.push(
+          context,
+          slideTransition(ChatScreen(chat: chat)),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка открытия чата: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
   }
 }

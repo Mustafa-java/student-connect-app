@@ -691,6 +691,52 @@ app.get('/api/projects/:id/zip-file', authMiddleware, async (req, res) => {
   }
 });
 
+// ==================== PROJECT COMMENTS ====================
+
+app.get('/api/projects/:id/comments', authMiddleware, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT c.*, u.name as author_name, u.email as author_email, u.avatar_url as author_avatar,
+             u.is_online as author_is_online
+      FROM project_comments c JOIN users u ON c.author_id = u.id
+      WHERE c.project_id = $1 ORDER BY c.created_at ASC
+    `, [req.params.id]);
+
+    res.json({ comments: result.rows });
+  } catch(e) {
+    console.error('Get project comments error:', e);
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+app.post('/api/projects/:id/comments', authMiddleware, async (req, res) => {
+  try {
+    const { content, reply_to_id } = req.body;
+    if (!content) {
+      return res.status(400).json({ error: 'content обязателен' });
+    }
+
+    const id = uuidv4();
+    await pool.query(
+      'INSERT INTO project_comments (id, project_id, author_id, content, reply_to_id) VALUES ($1, $2, $3, $4, $5)',
+      [id, req.params.id, req.userId, content, reply_to_id || null]
+    );
+
+    await pool.query('UPDATE projects SET comments_count = comments_count + 1 WHERE id = $1', [req.params.id]);
+
+    const result = await pool.query(`
+      SELECT c.*, u.name as author_name, u.email as author_email, u.avatar_url as author_avatar,
+             u.is_online as author_is_online
+      FROM project_comments c JOIN users u ON c.author_id = u.id WHERE c.id = $1
+    `, [id]);
+
+    res.status(201).json({ comment: result.rows[0] });
+  } catch(e) {
+    console.error('Create project comment error:', e);
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
 // ==================== CHATS ====================
 
 app.get('/api/chats', authMiddleware, async (req, res) => {
