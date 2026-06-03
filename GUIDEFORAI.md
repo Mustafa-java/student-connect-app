@@ -17,12 +17,35 @@
 
 ### Статус проекта
 
-✅ **Готов к защите диплома**
-- Полностью рабочий функционал
-- Backend развернут на облаке
+✅ **Активная разработка (2026-06-03)**
+- Полностью рабочий основной функционал
+- Backend развернут на облаке (Render.com)
+- База данных: PostgreSQL (облако)
 - Код на GitHub
-- ~8000+ строк Flutter кода
+- ~9000+ строк Flutter кода
 - ~1500+ строк backend кода
+
+🎉 **Последние обновления (2026-06-03)**
+- ✅ Комментарии к проектам (Backend + Flutter)
+- ✅ Навигация к профилю из карточек, постов, проектов
+- ✅ Подтверждение удаления везде
+- ✅ Функция "Поделиться" (внешняя + внутренняя через чаты)
+- ✅ Исправлен парсинг чатов и сообщений (PostgreSQL timestamp)
+- ✅ Список чатов работает корректно
+- ✅ Отправка сообщений работает
+
+🎉 **Обновления 2026-06-02**
+- ✅ Исправлена загрузка изображений постов и проектов
+- ✅ Добавлен просмотр подписчиков и подписок
+- ✅ Реализовано открытие чата из профиля и проектов
+- ✅ Добавлены кликабельные уведомления с навигацией
+- ✅ Создан экран "О приложении" в настройках
+
+🎉 **Миграция на PostgreSQL завершена (2026-05-31)**
+- ✅ Backend переписан с SQLite на PostgreSQL
+- ✅ PostgreSQL база создана на Render.com
+- ✅ API полностью протестирован
+- ✅ Flutter приложение обновлено
 
 ### Автор
 
@@ -223,9 +246,33 @@ backend/
 
 ### Важные переменные окружения
 
-На Render.com настроены:
-- `PORT` - автоматически назначается Render
+**На Render.com настроены:**
+- `DATABASE_URL` - Internal Database URL от PostgreSQL базы (автоматически)
 - `JWT_SECRET` - `student-connect-secret-key-2026`
+- `NODE_ENV` - `production`
+- `PORT` - автоматически назначается Render
+
+**Локально (.env файл):**
+```env
+DATABASE_URL=postgresql://postgres:password@localhost:5432/student_connect
+JWT_SECRET=student-connect-secret-key-2026
+NODE_ENV=development
+PORT=3000
+```
+
+### PostgreSQL база данных на Render
+
+**Информация о базе:**
+- **Название:** student-connect-db
+- **Database:** student_connect
+- **Регион:** Frankfurt, EU
+- **План:** Free
+- **Доступ:** Через Render Dashboard → PostgreSQL
+
+**Важно:**
+- Internal Database URL используется для подключения Web Service к базе
+- External Database URL используется для подключения с локальной машины (pgAdmin, psql)
+- База данных автоматически создает схему при первом запуске сервера
 
 ### API Эндпоинты
 
@@ -347,10 +394,31 @@ cd backend
 npm install                             # Установить зависимости
 npm start                               # Запустить сервер
 npm run dev                             # Запустить с watch mode
+npm run migrate                         # Миграция данных из SQLite в PostgreSQL
 
 # Проверка
 curl http://localhost:3000/             # Проверить локально
 curl https://student-connect-backend.onrender.com/  # Проверить production
+
+# Тестирование API
+# Откройте в браузере: backend/api-tester.html
+```
+
+### PostgreSQL
+
+```bash
+# Подключение к локальной базе
+psql -U postgres -d student_connect
+
+# Полезные команды
+\dt                                     # Список таблиц
+\d users                                # Описание таблицы users
+SELECT COUNT(*) FROM users;             # Количество пользователей
+SELECT * FROM users LIMIT 5;            # Первые 5 пользователей
+
+# Подключение к Render PostgreSQL
+# Используйте External Database URL из Render Dashboard
+psql "postgresql://user:pass@host/db"
 ```
 
 ### Git
@@ -399,10 +467,20 @@ static const String _baseUrl = 'https://student-connect-backend.onrender.com';
 
 - **Тип:** PostgreSQL
 - **Хостинг:** Render.com (Managed PostgreSQL)
+- **Название базы:** student-connect-db
+- **Database:** student_connect
 - **Хранение:** Персистентное на сервере Render
 - **Бэкап:** Автоматический на платных планах
 
-**Важно:** База данных НЕ в git (.gitignore)
+**Важно:** 
+- База данных НЕ в git (.gitignore)
+- Схема создается автоматически при первом запуске сервера
+- Старая SQLite база (student_connect.db) сохранена для миграции данных
+
+**Доступ к базе:**
+- Internal Database URL - для подключения Web Service
+- External Database URL - для подключения с локальной машины
+- Оба URL доступны в Render Dashboard → PostgreSQL → Connect
 
 ### 4. Загруженные файлы
 
@@ -429,6 +507,33 @@ static const String _baseUrl = 'https://student-connect-backend.onrender.com';
 1. Проверить статус: `curl https://student-connect-backend.onrender.com/`
 2. Подождать 30-50 секунд (сервер просыпается)
 3. Проверить интернет на устройстве
+
+### "type 'String' is not a subtype of type 'int'" (Flutter)
+
+**Причина:** PostgreSQL возвращает timestamp как строки, а Flutter ожидал числа
+
+**Решение:** ✅ Исправлено в `api_service.dart` (2026-05-31)
+- Методы `_parseUser`, `_parsePost`, `_parseComment`, `_parseProject` обновлены
+- Теперь корректно обрабатывают и строки, и числа
+
+### "Token validation failed"
+
+**Причина:** Старый токен от SQLite базы недействителен в PostgreSQL
+
+**Решение:**
+1. Выйти из аккаунта в настройках приложения
+2. Войти заново или зарегистрировать нового пользователя
+3. Токен обновится автоматически
+
+### "Email уже занят" при регистрации
+
+**Причина:** Email уже существует в базе данных
+
+**Решение:** Используйте другой email или войдите с существующим аккаунтом
+
+**Тестовые аккаунты:**
+- Email: `test@example.com`, Пароль: `password123`
+- Email: `1@com`, Пароль: `1`
 
 ### "Build failed" / Gradle ошибки
 
@@ -526,7 +631,133 @@ npm start                               # Запустить
 - **Строк кода (Flutter):** ~8000+
 - **Строк кода (Backend):** ~1500+
 - **Библиотек:** 25+
-- **Таблиц в БД:** 8
+- **Таблиц в БД:** 10 (PostgreSQL)
+- **Миграция на PostgreSQL:** Завершена 2026-05-31
+
+---
+
+## 🌐 Render.com - Облачный хостинг
+
+### Общая информация
+
+**Render.com** - облачная платформа для хостинга приложений и баз данных.
+
+**Аккаунт:**
+- Зарегистрирован через GitHub (Mustafa-java)
+- Логин: https://dashboard.render.com (через GitHub OAuth)
+- Регион: Frankfurt, EU
+
+### Web Service (Backend)
+
+**Информация:**
+- **Название:** student-connect-backend
+- **URL:** https://student-connect-backend.onrender.com
+- **Dashboard:** https://dashboard.render.com/web/srv-d8csddt7vvec73ckovt0
+- **План:** Free
+- **Регион:** Frankfurt
+
+**Настройки:**
+- **Build Command:** `npm install`
+- **Start Command:** `npm start`
+- **Auto-Deploy:** Включен (деплой при push в main)
+- **Branch:** main
+
+**Environment Variables:**
+```
+DATABASE_URL = (Internal Database URL от PostgreSQL)
+JWT_SECRET = student-connect-secret-key-2026
+NODE_ENV = production
+```
+
+**Особенности бесплатного плана:**
+- Засыпает после 15 минут неактивности
+- Первый запрос после сна: 30-50 секунд
+- 750 часов/месяц бесплатно
+- Автоматический деплой при push в GitHub
+
+### PostgreSQL Database
+
+**Информация:**
+- **Название:** student-connect-db
+- **Database:** student_connect
+- **Dashboard:** Render Dashboard → PostgreSQL
+- **План:** Free
+- **Регион:** Frankfurt
+
+**Connection URLs:**
+- **Internal Database URL:** Используется Web Service для подключения
+- **External Database URL:** Используется для подключения с локальной машины
+
+**Схема базы данных:**
+Создается автоматически при первом запуске сервера через `database.js`:
+- `users` - пользователи
+- `posts` - посты
+- `post_likes` - лайки постов
+- `comments` - комментарии
+- `projects` - проекты
+- `project_likes` - лайки проектов
+- `chats` - чаты
+- `chat_unread` - непрочитанные сообщения
+- `messages` - сообщения
+- `follows` - подписки
+
+### Как работает деплой
+
+1. **Разработчик делает изменения:**
+   ```bash
+   git add .
+   git commit -m "Описание изменений"
+   git push origin main
+   ```
+
+2. **Render автоматически:**
+   - Обнаруживает изменения в GitHub
+   - Запускает Build Command (`npm install`)
+   - Запускает Start Command (`npm start`)
+   - Деплоит новую версию (~3-5 минут)
+
+3. **Проверка:**
+   ```bash
+   curl https://student-connect-backend.onrender.com/
+   ```
+
+### Логи и мониторинг
+
+**Просмотр логов:**
+1. Открыть Dashboard → Web Service
+2. Перейти на вкладку "Logs"
+3. Смотреть real-time логи сервера
+
+**Что смотреть в логах:**
+- `✅ Connected to PostgreSQL database` - подключение к БД
+- `✅ Database schema initialized successfully` - схема создана
+- `🚀 Server running on port 10000` - сервер запущен
+- `[timestamp] POST /api/auth/register` - запросы к API
+
+### Troubleshooting на Render
+
+**"Application failed to respond"**
+- Проверить Environment Variables (DATABASE_URL, JWT_SECRET)
+- Проверить логи на ошибки
+- Убедиться, что PostgreSQL база создана
+
+**"Build failed"**
+- Проверить package.json на ошибки
+- Проверить логи Build процесса
+- Убедиться, что все зависимости установлены
+
+**"Database connection failed"**
+- Проверить DATABASE_URL в Environment
+- Убедиться, что используется Internal Database URL
+- Проверить, что PostgreSQL база активна
+
+### Полезные ссылки
+
+- **Render Dashboard:** https://dashboard.render.com
+- **Render Docs:** https://render.com/docs
+- **PostgreSQL Guide:** https://render.com/docs/databases
+- **Web Service Logs:** Dashboard → Logs
+- **Environment Variables:** Dashboard → Environment
 
 ---
 
@@ -578,4 +809,115 @@ npm start                               # Запустить
 
 **Готово! Теперь ты знаешь все о проекте Student Connect! 🚀**
 
-*Последнее обновление: 2026-05-31 (Миграция на PostgreSQL завершена)*
+---
+
+## 📝 История изменений
+
+### 2026-05-31: Миграция на PostgreSQL ✅
+- Backend переписан с SQLite на PostgreSQL
+- PostgreSQL база создана на Render.com
+- Все API эндпоинты протестированы
+- Flutter приложение обновлено (исправлен парсинг timestamp)
+- Документация обновлена (10+ новых файлов)
+- Веб-тестер API создан (backend/api-tester.html)
+
+**Важные файлы миграции:**
+- `backend/MIGRATION.md` - полное руководство по миграции
+- `backend/TESTING.md` - инструкции по тестированию
+- `backend/DEPLOY.md` - быстрый деплой на Render
+- `MIGRATION_COMPLETE.md` - итоговая сводка
+- `FIXES_APPLIED.md` - последние исправления
+- `TESTING_GUIDE.md` - гайд по тестированию Flutter
+
+**Тестовые аккаунты:**
+- Email: `test@example.com`, Пароль: `password123`
+- Email: `1@com`, Пароль: `1`
+
+### 2026-06-02: Критические улучшения ✅
+**Исправлена загрузка изображений:**
+- Backend: добавлен multer для изображений, раздача статических файлов
+- Flutter: отправка файлов через FormData, конвертация путей в URL
+- Теперь изображения постов/проектов работают на всех устройствах
+
+**Добавлен функционал социальной сети:**
+- ✅ Просмотр подписчиков и подписок (новый экран `followers_screen.dart`)
+- ✅ Открытие чата с пользователем из профиля и проектов
+- ✅ Кликабельные уведомления с навигацией к постам/проектам/профилям
+- ✅ Навигация к профилю автора из постов и проектов (уже было)
+- ✅ Экран "О приложении" в настройках с информацией о проекте
+
+**Файлы изменены:**
+- `lib/features/profile/followers_screen.dart` (создан)
+- `lib/features/profile/profile_screen.dart` (навигация к подписчикам)
+- `lib/features/profile/other_user_profile_screen.dart` (навигация к подписчикам)
+- `lib/features/project/project_detail_screen.dart` (открытие чата)
+- `lib/features/notifications/notifications_screen.dart` (обработка нажатий)
+- `lib/features/settings/about_screen.dart` (создан)
+- `lib/features/settings/settings_screen.dart` (навигация к "О приложении")
+- `backend/server.js` (multer для изображений, статические файлы)
+- `lib/services/api_service.dart` (FormData для загрузки файлов)
+
+---
+
+## 📋 ПЛАН ДАЛЬНЕЙШЕГО РАЗВИТИЯ
+
+### 🚀 ЭТАП 1: Критический функционал (осталось ~2 часа)
+- ✅ О приложении в настройках - **ГОТОВО**
+- ⏳ Комментарии к проектам (Backend + Flutter) - **В РАБОТЕ**
+- ⏸️ Навигация из карточки проекта (10 мин)
+- ⏸️ Подтверждение удаления везде (15 мин)
+- ⏸️ Поделиться постами/проектами (30 мин)
+
+### 🎨 ЭТАП 2: Улучшение UX (~2-3 часа)
+- Refresh в деталях постов/проектов
+- Двойной тап на проект = лайк
+- Анимация лайков в проектах
+- Skeleton loaders вместо CircularProgressIndicator
+- Улучшенные пустые состояния
+
+### 💡 ЭТАП 3: Дополнительный функционал (~2-3 часа)
+- Редактирование постов и проектов
+- Фильтры и сортировка в поиске
+- Лайки и удаление комментариев
+- Закладки (сохраненные посты)
+
+### 🔧 ЭТАП 4: Мелкие фиксы (~1 час)
+- Копирование текста из постов
+- Кнопки в чате (поиск, очистка)
+- Кнопки в просмотре изображений
+- Обработка ошибок сети
+
+**Подробный план:** См. `DETAILED_DEVELOPMENT_PLAN.md`  
+**Быстрые улучшения:** См. `QUICK_IMPROVEMENTS.md`
+
+---
+
+## 🎯 ДЛЯ ЗАЩИТЫ ДИПЛОМА
+
+### Что уже готово:
+- ✅ Регистрация и авторизация (JWT)
+- ✅ Лента постов с изображениями
+- ✅ Создание постов и проектов с изображениями
+- ✅ Лайки и комментарии к постам
+- ✅ Чаты и сообщения в реальном времени
+- ✅ Профили пользователей (свой и чужие)
+- ✅ Редактирование профиля
+- ✅ Поиск пользователей
+- ✅ Подписки и подписчики
+- ✅ Просмотр проектов и деталей
+- ✅ Скачивание ZIP файлов проектов
+- ✅ Уведомления с навигацией
+- ✅ Удаление своих постов и проектов
+- ✅ Backend на облаке (Render.com)
+- ✅ PostgreSQL база на облаке
+
+### Для идеальной защиты добавить:
+- Комментарии к проектам
+- Функцию "Поделиться"
+- Улучшенную анимацию и UX
+
+**Приложение уже полностью функционально и готово к защите!**
+
+---
+
+*Последнее обновление: 2026-06-02 (Критические улучшения завершены)*
