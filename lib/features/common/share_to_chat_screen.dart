@@ -10,11 +10,17 @@ import '../../services/api_service.dart';
 class ShareToChatScreen extends ConsumerStatefulWidget {
   final String shareText;
   final String shareTitle;
+  final String messageType;
+  final String? postId;
+  final String? projectId;
 
   const ShareToChatScreen({
     super.key,
     required this.shareText,
     required this.shareTitle,
+    this.messageType = 'text',
+    this.postId,
+    this.projectId,
   });
 
   @override
@@ -33,6 +39,8 @@ class _ShareToChatScreenState extends ConsumerState<ShareToChatScreen> {
       await ApiService.instance.sendMessage(
         chatId: chat.id,
         content: widget.shareText,
+        type: widget.messageType,
+        projectId: widget.projectId ?? widget.postId,
       );
 
       if (mounted) {

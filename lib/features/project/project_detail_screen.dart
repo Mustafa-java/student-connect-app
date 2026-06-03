@@ -1504,6 +1504,8 @@ $descriptionPreview
         builder: (context) => ShareToChatScreen(
           shareText: shareText,
           shareTitle: _project.title,
+          messageType: 'project',
+          projectId: _project.id,
         ),
       ),
     );

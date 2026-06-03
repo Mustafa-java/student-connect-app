@@ -111,6 +111,7 @@ enum MessageType {
   image('image'),
   file('file'),
   project('project'),
+  post('post'),
   system('system');
 
   final String value;

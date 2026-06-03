@@ -774,6 +774,8 @@ ${contentPreview.isNotEmpty ? contentPreview : 'Без текста'}
         builder: (context) => ShareToChatScreen(
           shareText: shareText,
           shareTitle: 'Пост от ${widget.post.author.name}',
+          messageType: 'post',
+          postId: widget.post.id,
         ),
       ),
     );
