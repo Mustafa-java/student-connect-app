@@ -192,13 +192,27 @@ class _OtherUserProfileScreenState extends ConsumerState<OtherUserProfileScreen>
       currentUser: user,
       unreadCount: data['unread_count'] ?? 0,
       isOnline: _toBool(data['is_online']),
-      lastMessageAt: data['last_message_at'] != null
-          ? DateTime.fromMillisecondsSinceEpoch(data['last_message_at'])
-          : null,
-      createdAt: data['created_at'] != null
-          ? DateTime.fromMillisecondsSinceEpoch(data['created_at'])
-          : DateTime.now(),
+      lastMessageAt: _parseTimestampNullable(data['last_message_at']),
+      createdAt: _parseTimestamp(data['created_at']),
     );
+  }
+
+  /// Универсальный парсер timestamp
+  DateTime _parseTimestamp(dynamic value) {
+    if (value == null) return DateTime.now();
+    if (value is int) return DateTime.fromMillisecondsSinceEpoch(value);
+    if (value is String) {
+      final parsed = int.tryParse(value);
+      if (parsed != null) return DateTime.fromMillisecondsSinceEpoch(parsed);
+      final dateTime = DateTime.tryParse(value);
+      if (dateTime != null) return dateTime;
+    }
+    return DateTime.now();
+  }
+
+  DateTime? _parseTimestampNullable(dynamic value) {
+    if (value == null) return null;
+    return _parseTimestamp(value);
   }
 
   /// Преобразуем int или bool в bool

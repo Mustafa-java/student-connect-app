@@ -1456,6 +1456,24 @@ $descriptionPreview
     Share.share(shareText, subject: _project.title);
   }
 
+  /// Универсальный парсер timestamp
+  DateTime _parseTimestamp(dynamic value) {
+    if (value == null) return DateTime.now();
+    if (value is int) return DateTime.fromMillisecondsSinceEpoch(value);
+    if (value is String) {
+      final parsed = int.tryParse(value);
+      if (parsed != null) return DateTime.fromMillisecondsSinceEpoch(parsed);
+      final dateTime = DateTime.tryParse(value);
+      if (dateTime != null) return dateTime;
+    }
+    return DateTime.now();
+  }
+
+  DateTime? _parseTimestampNullable(dynamic value) {
+    if (value == null) return null;
+    return _parseTimestamp(value);
+  }
+
   String _getTimeAgo(DateTime dateTime) {
     final now = DateTime.now();
     final diff = now.difference(dateTime);
@@ -1504,12 +1522,8 @@ $descriptionPreview
           currentUser: widget.project.author,
           unreadCount: chatData['unread_count'] as int? ?? 0,
           isOnline: (chatData['is_online'] as int?) == 1,
-          lastMessageAt: chatData['last_message_at'] != null
-              ? DateTime.fromMillisecondsSinceEpoch(chatData['last_message_at'])
-              : null,
-          createdAt: chatData['created_at'] != null
-              ? DateTime.fromMillisecondsSinceEpoch(chatData['created_at'])
-              : DateTime.now(),
+          lastMessageAt: _parseTimestampNullable(chatData['last_message_at']),
+          createdAt: _parseTimestamp(chatData['created_at']),
         );
 
         Navigator.push(
