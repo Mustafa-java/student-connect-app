@@ -385,31 +385,37 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
             // Автор
             Row(
               children: [
-                CustomAvatar(
-                  radius: 16,
-                  imageUrl: post.author.avatarUrl,
+                GestureDetector(
+                  onTap: () => _navigateToProfile(post.author),
+                  child: CustomAvatar(
+                    radius: 16,
+                    imageUrl: post.author.avatarUrl,
+                  ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        post.author.name,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      if (post.author.university != null)
+                  child: GestureDetector(
+                    onTap: () => _navigateToProfile(post.author),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         Text(
-                          post.author.university!,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: AppColors.textDarkSecondary,
+                          post.author.name,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                    ],
+                        if (post.author.university != null)
+                          Text(
+                            post.author.university!,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppColors.textDarkSecondary,
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
                 Text(
@@ -508,6 +514,23 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
     if (diff.inDays < 1) return '${diff.inHours} ч.';
     if (diff.inDays < 7) return '${diff.inDays} дн.';
     return '${dateTime.day}.${dateTime.month}';
+  }
+
+  void _navigateToProfile(User user) {
+    final currentUser = ref.read(currentUserProvider);
+    if (currentUser != null && user.id == currentUser.id) {
+      // Переход к своему профилю
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const ProfileScreen()),
+      );
+    } else {
+      // Переход к чужому профилю
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => OtherUserProfileScreen(user: user)),
+      );
+    }
   }
 
   // ==================== ПРОЕКТЫ ====================
