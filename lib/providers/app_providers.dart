@@ -464,6 +464,7 @@ Message _parseMessage(Map<String, dynamic> data, String chatId) {
     sender: senderUser,
     content: data['content'] ?? '',
     type: _messageTypeFromString(data['type'] ?? 'text'),
+    projectId: data['project_id'],
     isRead: isRead,
     createdAt: _parseTimestamp(data['created_at']),
     readAt: _parseTimestampNullable(data['read_at']),

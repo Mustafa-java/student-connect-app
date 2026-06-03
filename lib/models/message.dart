@@ -10,6 +10,7 @@ class Message extends Equatable {
   final String content;
   final MessageType type;
   final Project? sharedProject; // Если это сообщение с проектом
+  final String? projectId; // ID поста или проекта
   final List<String> attachments; // URLs изображений/файлов
   final bool isRead;
   final DateTime createdAt;
@@ -22,6 +23,7 @@ class Message extends Equatable {
     required this.content,
     this.type = MessageType.text,
     this.sharedProject,
+    this.projectId,
     this.attachments = const [],
     this.isRead = false,
     required this.createdAt,
@@ -36,6 +38,7 @@ class Message extends Equatable {
         content,
         type,
         sharedProject,
+        projectId,
         attachments,
         isRead,
         createdAt,
@@ -49,6 +52,7 @@ class Message extends Equatable {
     String? content,
     MessageType? type,
     Project? sharedProject,
+    String? projectId,
     List<String>? attachments,
     bool? isRead,
     DateTime? createdAt,
@@ -61,6 +65,7 @@ class Message extends Equatable {
       content: content ?? this.content,
       type: type ?? this.type,
       sharedProject: sharedProject ?? this.sharedProject,
+      projectId: projectId ?? this.projectId,
       attachments: attachments ?? this.attachments,
       isRead: isRead ?? this.isRead,
       createdAt: createdAt ?? this.createdAt,

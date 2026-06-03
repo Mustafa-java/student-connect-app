@@ -5,6 +5,8 @@ import '../../core/widgets/custom_avatar.dart';
 import '../../models/models.dart';
 import '../../providers/app_providers.dart';
 import '../../services/api_service.dart';
+import '../post/post_detail_screen.dart';
+import '../project/project_detail_screen.dart';
 
 /// Экран чата — стиль Instagram 2025
 class ChatScreen extends ConsumerStatefulWidget {
@@ -231,6 +233,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Widget _buildMessageBubble(Message message, bool isMe) {
+    // Для постов и проектов показываем превью
+    if (message.type == MessageType.post || message.type == MessageType.project) {
+      return _buildSharedContentBubble(message, isMe);
+    }
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: Row(
@@ -297,6 +304,178 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildSharedContentBubble(Message message, bool isMe) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        mainAxisAlignment:
+            isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        children: [
+          Flexible(
+            child: GestureDetector(
+              onTap: () => _openSharedContent(message),
+              child: Container(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.of(context).size.width * 0.75,
+                ),
+                decoration: BoxDecoration(
+                  gradient: isMe ? AppColors.primaryGradient : null,
+                  color: isMe ? null : AppColors.surfaceDark,
+                  borderRadius: BorderRadius.only(
+                    topLeft: const Radius.circular(18),
+                    topRight: const Radius.circular(18),
+                    bottomLeft: Radius.circular(isMe ? 18 : 4),
+                    bottomRight: Radius.circular(isMe ? 4 : 18),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Превью контента
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.only(
+                          topLeft: const Radius.circular(18),
+                          topRight: const Radius.circular(18),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            message.type == MessageType.post
+                                ? Icons.article_outlined
+                                : Icons.folder_outlined,
+                            color: Colors.white,
+                            size: 40,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  message.type == MessageType.post
+                                      ? 'Поделился постом'
+                                      : 'Поделился проектом',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.white.withValues(alpha: 0.7),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  message.content.split('\n').first.replaceAll('📝 ', '').replaceAll('📌 ', ''),
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(
+                            Icons.arrow_forward_ios,
+                            size: 14,
+                            color: Colors.white.withValues(alpha: 0.5),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Время
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _formatMessageTime(message.createdAt),
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.white.withValues(alpha: 0.6),
+                            ),
+                          ),
+                          if (isMe) ...[
+                            const SizedBox(width: 4),
+                            Icon(
+                              message.isRead ? Icons.done_all : Icons.done_outlined,
+                              size: 12,
+                              color: message.isRead
+                                  ? AppColors.accent
+                                  : Colors.white.withValues(alpha: 0.6),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openSharedContent(Message message) async {
+    if (message.projectId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('ID контента не найден')),
+      );
+      return;
+    }
+
+    try {
+      if (message.type == MessageType.post) {
+        // Загрузка поста по ID
+        final posts = await ApiService.instance.getPosts();
+        final post = posts.firstWhere(
+          (p) => p.id == message.projectId,
+          orElse: () => throw Exception('Пост не найден'),
+        );
+
+        if (mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => PostDetailScreen(post: post),
+            ),
+          );
+        }
+      } else if (message.type == MessageType.project) {
+        // Загрузка проекта по ID
+        final projects = await ApiService.instance.getProjects();
+        final project = projects.firstWhere(
+          (p) => p.id == message.projectId,
+          orElse: () => throw Exception('Проект не найден'),
+        );
+
+        if (mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ProjectDetailScreen(project: project),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка: ${e.toString()}'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildInputArea() {
