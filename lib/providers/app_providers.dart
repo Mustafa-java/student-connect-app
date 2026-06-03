@@ -351,9 +351,7 @@ Chat _parseChat(Map<String, dynamic> data) {
       content: lastMsgData['content'] ?? '',
       type: _messageTypeFromString(lastMsgData['type'] ?? 'text'),
       isRead: false,
-      createdAt: lastMsgData['created_at'] != null
-          ? DateTime.fromMillisecondsSinceEpoch(lastMsgData['created_at'])
-          : DateTime.now(),
+      createdAt: _parseTimestamp(lastMsgData['created_at']),
     );
   }
 
@@ -363,13 +361,28 @@ Chat _parseChat(Map<String, dynamic> data) {
     lastMessage: lastMessage,
     unreadCount: data['unread_count'] ?? 0,
     isOnline: _toBool(data['is_online']),
-    lastMessageAt: data['last_message_at'] != null
-        ? DateTime.fromMillisecondsSinceEpoch(data['last_message_at'])
-        : null,
-    createdAt: data['created_at'] != null
-        ? DateTime.fromMillisecondsSinceEpoch(data['created_at'])
-        : DateTime.now(),
+    lastMessageAt: _parseTimestampNullable(data['last_message_at']),
+    createdAt: _parseTimestamp(data['created_at']),
   );
+}
+
+/// Универсальный парсер timestamp (поддерживает int, String, null)
+DateTime _parseTimestamp(dynamic value) {
+  if (value == null) return DateTime.now();
+  if (value is int) return DateTime.fromMillisecondsSinceEpoch(value);
+  if (value is String) {
+    final parsed = int.tryParse(value);
+    if (parsed != null) return DateTime.fromMillisecondsSinceEpoch(parsed);
+    // Попытка парсить ISO8601
+    final dateTime = DateTime.tryParse(value);
+    if (dateTime != null) return dateTime;
+  }
+  return DateTime.now();
+}
+
+DateTime? _parseTimestampNullable(dynamic value) {
+  if (value == null) return null;
+  return _parseTimestamp(value);
 }
 
 /// Преобразуем int или bool в bool
@@ -432,17 +445,6 @@ Message _parseMessage(Map<String, dynamic> data, String chatId) {
   final isReadRaw = data['is_read'];
   final isRead = isReadRaw == true || isReadRaw == 1;
 
-  // created_at может быть int (ms) или Timestamp
-  DateTime createdAt;
-  final createdAtRaw = data['created_at'];
-  if (createdAtRaw is int) {
-    createdAt = createdAtRaw > 1000000000000
-        ? DateTime.fromMillisecondsSinceEpoch(createdAtRaw)
-        : DateTime.fromMillisecondsSinceEpoch(createdAtRaw * 1000);
-  } else {
-    createdAt = DateTime.now();
-  }
-
   return Message(
     id: data['id'] ?? '',
     chatId: chatId,
@@ -450,10 +452,8 @@ Message _parseMessage(Map<String, dynamic> data, String chatId) {
     content: data['content'] ?? '',
     type: _messageTypeFromString(data['type'] ?? 'text'),
     isRead: isRead,
-    createdAt: createdAt,
-    readAt: data['read_at'] != null
-        ? DateTime.fromMillisecondsSinceEpoch(data['read_at'] as int)
-        : null,
+    createdAt: _parseTimestamp(data['created_at']),
+    readAt: _parseTimestampNullable(data['read_at']),
   );
 }
 
