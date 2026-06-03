@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/custom_avatar.dart';
 import '../../core/widgets/smart_image.dart';
@@ -11,6 +12,7 @@ import '../../services/api_service.dart';
 import '../project/project_detail_screen.dart';
 import '../post/post_detail_screen.dart';
 import '../messages/chat_screen.dart';
+import 'followers_screen.dart';
 
 /// Экран просмотра чужого профиля
 class OtherUserProfileScreen extends ConsumerStatefulWidget {
@@ -312,9 +314,11 @@ class _OtherUserProfileScreenState extends ConsumerState<OtherUserProfileScreen>
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
-                          _buildStatItem('${widget.user.projectsCount}', 'Проекты'),
-                          _buildStatItem('${widget.user.followersCount}', 'Подп.'),
-                          _buildStatItem('${widget.user.followingCount}', 'Подписки'),
+                          _buildStatItem('${widget.user.projectsCount}', 'Проекты', onTap: null),
+                          _buildStatItem('${widget.user.followersCount}', 'Подп.',
+                            onTap: () => _openFollowersScreen(showFollowers: true)),
+                          _buildStatItem('${widget.user.followingCount}', 'Подписки',
+                            onTap: () => _openFollowersScreen(showFollowers: false)),
                         ],
                       ),
                     ),
@@ -587,8 +591,8 @@ class _OtherUserProfileScreenState extends ConsumerState<OtherUserProfileScreen>
     );
   }
 
-  Widget _buildStatItem(String value, String label) {
-    return Column(
+  Widget _buildStatItem(String value, String label, {VoidCallback? onTap}) {
+    final widget = Column(
       children: [
         Text(
           value,
@@ -606,6 +610,27 @@ class _OtherUserProfileScreenState extends ConsumerState<OtherUserProfileScreen>
           ),
         ),
       ],
+    );
+
+    if (onTap != null) {
+      return GestureDetector(
+        onTap: onTap,
+        child: widget,
+      );
+    }
+    return widget;
+  }
+
+  void _openFollowersScreen({required bool showFollowers}) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => FollowersScreen(
+          userId: widget.user.id,
+          userName: widget.user.name,
+          showFollowers: showFollowers,
+        ),
+      ),
     );
   }
 
@@ -844,7 +869,7 @@ class _OtherUserProfileScreenState extends ConsumerState<OtherUserProfileScreen>
               title: const Text('Поделиться профилем'),
               onTap: () {
                 Navigator.pop(context);
-                // TODO: Share functionality
+                _shareProfile();
               },
             ),
             ListTile(
@@ -860,6 +885,28 @@ class _OtherUserProfileScreenState extends ConsumerState<OtherUserProfileScreen>
         ),
       ),
     );
+  }
+
+  void _shareProfile() {
+    final user = widget.user;
+    final bioPreview = user.bio != null && user.bio!.isNotEmpty
+        ? user.bio!.length > 100
+            ? '${user.bio!.substring(0, 100)}...'
+            : user.bio!
+        : '';
+
+    final skills = user.skills.take(5).join(', ');
+
+    final shareText = '''
+Профиль студента в Student Connect!
+
+👤 ${user.name}
+${user.university ?? ''}${user.faculty != null ? ' - ${user.faculty}' : ''}${user.course != null ? ' (${user.course} курс)' : ''}
+
+${bioPreview.isNotEmpty ? '$bioPreview\n\n' : ''}${skills.isNotEmpty ? '💻 Навыки: $skills\n\n' : ''}📊 Проекты: ${user.projectsCount} | Подписчики: ${user.followersCount}
+''';
+
+    Share.share(shareText, subject: 'Профиль ${user.name}');
   }
 }
 

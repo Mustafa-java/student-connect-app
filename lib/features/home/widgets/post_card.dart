@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:readmore/readmore.dart';
 import 'package:carousel_slider/carousel_slider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/custom_avatar.dart';
 import '../../../core/widgets/smart_image.dart';
@@ -691,12 +692,37 @@ class _PostCardState extends State<PostCard>
               ),
             _buildMenuItem(Icons.flag_outlined, 'Пожаловаться'),
             _buildMenuItem(Icons.person_remove_outlined, 'Отписаться'),
-            _buildMenuItem(Icons.share_outlined, 'Поделиться'),
+            ListTile(
+              leading: const Icon(Icons.share_outlined, size: 22),
+              title: const Text('Поделиться'),
+              onTap: () {
+                Navigator.pop(context);
+                _sharePost();
+              },
+            ),
             const SizedBox(height: 16),
           ],
         ),
       ),
     );
+  }
+
+  void _sharePost() {
+    final content = widget.post.content ?? '';
+    final contentPreview = content.length > 100
+        ? '${content.substring(0, 100)}...'
+        : content;
+
+    final shareText = '''
+Посмотри пост в Student Connect!
+
+Автор: ${widget.post.author.name}
+${contentPreview.isNotEmpty ? '\n$contentPreview' : ''}
+
+Лайков: ${widget.post.likesCount} | Комментариев: ${widget.post.commentsCount}
+''';
+
+    Share.share(shareText, subject: 'Пост от ${widget.post.author.name}');
   }
 
   Widget _buildMenuItem(IconData icon, String title) {

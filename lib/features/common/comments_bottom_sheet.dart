@@ -299,11 +299,41 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
                     if (isOwnComment) ...[
                       const Spacer(),
                       GestureDetector(
-                        onTap: () {
-                          ref
-                              .read(
-                                  postCommentsProvider(widget.postId).notifier)
-                              .deleteComment(index);
+                        onTap: () async {
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              backgroundColor: AppColors.surfaceDark,
+                              title: const Text(
+                                'Удалить комментарий?',
+                                style: TextStyle(color: AppColors.textDark),
+                              ),
+                              content: const Text(
+                                'Комментарий будет удалён безвозвратно.',
+                                style: TextStyle(color: AppColors.textDarkSecondary),
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context, false),
+                                  child: const Text('Отмена'),
+                                ),
+                                ElevatedButton(
+                                  onPressed: () => Navigator.pop(context, true),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.error,
+                                  ),
+                                  child: const Text('Удалить'),
+                                ),
+                              ],
+                            ),
+                          );
+
+                          if (confirm == true) {
+                            ref
+                                .read(
+                                    postCommentsProvider(widget.postId).notifier)
+                                .deleteComment(index);
+                          }
                         },
                         child: Icon(
                           Icons.delete_outline,

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:readmore/readmore.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/custom_avatar.dart';
 import '../../core/widgets/smart_image.dart';
@@ -575,10 +576,40 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                     const Spacer(),
                     if (isOwnComment)
                       GestureDetector(
-                        onTap: () {
-                          ref
-                              .read(projectCommentsProvider(widget.project.id).notifier)
-                              .deleteComment(index);
+                        onTap: () async {
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              backgroundColor: AppColors.surfaceDark,
+                              title: const Text(
+                                'Удалить комментарий?',
+                                style: TextStyle(color: AppColors.textDark),
+                              ),
+                              content: const Text(
+                                'Комментарий будет удалён безвозвратно.',
+                                style: TextStyle(color: AppColors.textDarkSecondary),
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context, false),
+                                  child: const Text('Отмена'),
+                                ),
+                                ElevatedButton(
+                                  onPressed: () => Navigator.pop(context, true),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.error,
+                                  ),
+                                  child: const Text('Удалить'),
+                                ),
+                              ],
+                            ),
+                          );
+
+                          if (confirm == true) {
+                            ref
+                                .read(projectCommentsProvider(widget.project.id).notifier)
+                                .deleteComment(index);
+                          }
                         },
                         child: Icon(
                           Icons.delete_outline,
@@ -1378,7 +1409,14 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
               ),
             _buildMenuItem(Icons.flag_outlined, 'Пожаловаться'),
             _buildMenuItem(Icons.person_remove_outlined, 'Отписаться'),
-            _buildMenuItem(Icons.share_outlined, 'Поделиться'),
+            ListTile(
+              leading: const Icon(Icons.share_outlined, size: 22),
+              title: const Text('Поделиться'),
+              onTap: () {
+                Navigator.pop(context);
+                _shareProject();
+              },
+            ),
             const SizedBox(height: 16),
           ],
         ),
@@ -1392,6 +1430,30 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       title: Text(title),
       onTap: () => Navigator.pop(context),
     );
+  }
+
+  void _shareProject() {
+    final descriptionPreview = _project.description.length > 150
+        ? '${_project.description.substring(0, 150)}...'
+        : _project.description;
+
+    final skills = _project.skills.take(5).join(', ');
+
+    final shareText = '''
+Посмотри проект в Student Connect!
+
+📌 ${_project.title}
+
+Автор: ${_project.author.name}
+
+$descriptionPreview
+
+Технологии: $skills
+
+👍 ${_project.likesCount} | 💬 ${_project.commentsCount} | 👁 ${_project.viewsCount}
+''';
+
+    Share.share(shareText, subject: _project.title);
   }
 
   String _getTimeAgo(DateTime dateTime) {

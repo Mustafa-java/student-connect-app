@@ -3,9 +3,13 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/smart_image.dart';
 import '../../models/models.dart';
+import '../../features/profile/profile_screen.dart';
+import '../../features/profile/other_user_profile_screen.dart';
+import '../../providers/app_providers.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Карточка проекта для отображения в ленте и поиске
-class ProjectCard extends StatelessWidget {
+class ProjectCard extends ConsumerWidget {
   final Project project;
   final VoidCallback? onTap;
   final bool showAuthor;
@@ -18,7 +22,7 @@ class ProjectCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final imageUrl = project.images.isNotEmpty
         ? project.images.first
         : 'https://picsum.photos/seed/${project.id}/300/400';
@@ -210,30 +214,54 @@ class ProjectCard extends StatelessWidget {
 
                       // Автор (опционально)
                       if (showAuthor) ...[
-                        Row(
-                          children: [
-                            CircleAvatar(
-                              radius: 10,
-                              backgroundImage: NetworkImage(
-                                (project.author.avatarUrl == null || project.author.avatarUrl!.isEmpty)
-                                    ? 'https://ui-avatars.com/api/?name=${project.author.name}&background=6366F1&color=fff'
-                                    : project.author.avatarUrl!,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                project.author.name,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: AppColors.textDarkSecondary,
-                                  fontWeight: FontWeight.w500,
+                        GestureDetector(
+                          onTap: () {
+                            final currentUser = ref.read(currentUserProvider);
+                            if (currentUser != null && project.author.id == currentUser.id) {
+                              // Переход к своему профилю
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const ProfileScreen(),
                                 ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                              );
+                            } else {
+                              // Переход к чужому профилю
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => OtherUserProfileScreen(
+                                    userId: project.author.id,
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                          child: Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 10,
+                                backgroundImage: NetworkImage(
+                                  (project.author.avatarUrl == null || project.author.avatarUrl!.isEmpty)
+                                      ? 'https://ui-avatars.com/api/?name=${project.author.name}&background=6366F1&color=fff'
+                                      : project.author.avatarUrl!,
+                                ),
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  project.author.name,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.textDarkSecondary,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                         const SizedBox(height: 4),
                       ],
