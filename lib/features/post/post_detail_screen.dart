@@ -9,6 +9,8 @@ import '../../providers/app_providers.dart';
 import '../../models/models.dart';
 import '../../services/api_service.dart';
 import '../common/image_viewer_screen.dart';
+import '../profile/profile_screen.dart';
+import '../profile/other_user_profile_screen.dart';
 
 /// Провайдер комментариев для постов
 final postCommentsDetailProvider =
@@ -107,6 +109,23 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
         );
       }
     });
+  }
+
+  void _navigateToProfile(User author) {
+    final currentUser = ref.read(currentUserProvider);
+    if (currentUser != null && author.id == currentUser.id) {
+      // Переход к своему профилю
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const ProfileScreen()),
+      );
+    } else {
+      // Переход к чужому профилю
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => OtherUserProfileScreen(user: author)),
+      );
+    }
   }
 
   @override
@@ -504,26 +523,32 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
         bottom: false,
         child: Row(
           children: [
-            CustomAvatar(radius: 16, imageUrl: author.avatarUrl, hasStoryGradient: true),
+            GestureDetector(
+              onTap: () => _navigateToProfile(author),
+              child: CustomAvatar(radius: 16, imageUrl: author.avatarUrl, hasStoryGradient: true),
+            ),
             const SizedBox(width: 10),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    author.name,
-                    style: const TextStyle(
-                        fontSize: 14, fontWeight: FontWeight.w600),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (author.university != null)
+              child: GestureDetector(
+                onTap: () => _navigateToProfile(author),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Text(
-                      author.university!,
-                      style: TextStyle(
-                          fontSize: 11, color: AppColors.textDarkSecondary),
+                      author.name,
+                      style: const TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.w600),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                ],
+                    if (author.university != null)
+                      Text(
+                        author.university!,
+                        style: TextStyle(
+                            fontSize: 11, color: AppColors.textDarkSecondary),
+                      ),
+                  ],
+                ),
               ),
             ),
             IconButton(
