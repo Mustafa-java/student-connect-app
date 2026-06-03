@@ -528,10 +528,13 @@ class _PostCardState extends State<PostCard>
                 ),
               ),
               const SizedBox(width: 12),
-              Icon(
-                Icons.send_outlined,
-                size: 24,
-                color: AppColors.textDark,
+              GestureDetector(
+                onTap: _sharePost,
+                child: Icon(
+                  Icons.send_outlined,
+                  size: 24,
+                  color: AppColors.textDark,
+                ),
               ),
               const Spacer(),
               GestureDetector(

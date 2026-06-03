@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:carousel_slider/carousel_slider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/custom_avatar.dart';
 import '../../core/widgets/smart_image.dart';
@@ -9,6 +10,7 @@ import '../../providers/app_providers.dart';
 import '../../models/models.dart';
 import '../../services/api_service.dart';
 import '../common/image_viewer_screen.dart';
+import '../common/share_to_chat_screen.dart';
 import '../profile/profile_screen.dart';
 import '../profile/other_user_profile_screen.dart';
 
@@ -126,6 +128,92 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
         MaterialPageRoute(builder: (context) => OtherUserProfileScreen(user: author)),
       );
     }
+  }
+
+  void _sharePost() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surfaceDark,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(top: 10, bottom: 16),
+              decoration: BoxDecoration(
+                color: AppColors.textDarkSecondary.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.chat_bubble_outline),
+              title: const Text('Отправить в чате'),
+              onTap: () {
+                Navigator.pop(context);
+                _shareInApp();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.share_outlined),
+              title: const Text('Поделиться вне приложения'),
+              onTap: () {
+                Navigator.pop(context);
+                _shareExternal();
+              },
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _shareInApp() {
+    final content = widget.post.content ?? '';
+    final contentPreview = content.length > 100
+        ? '${content.substring(0, 100)}...'
+        : content;
+
+    final shareText = '''
+📝 Пост от ${widget.post.author.name}
+
+${contentPreview.isNotEmpty ? contentPreview : 'Без текста'}
+
+👍 ${widget.post.likesCount} | 💬 ${widget.post.commentsCount}
+''';
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ShareToChatScreen(
+          shareText: shareText,
+          shareTitle: 'Пост от ${widget.post.author.name}',
+        ),
+      ),
+    );
+  }
+
+  void _shareExternal() {
+    final content = widget.post.content ?? '';
+    final contentPreview = content.length > 100
+        ? '${content.substring(0, 100)}...'
+        : content;
+
+    final shareText = '''
+Посмотри пост в Student Connect!
+
+Автор: ${widget.post.author.name}
+${contentPreview.isNotEmpty ? '\n$contentPreview' : ''}
+
+Лайков: ${widget.post.likesCount} | Комментариев: ${widget.post.commentsCount}
+''';
+
+    Share.share(shareText, subject: 'Пост от ${widget.post.author.name}');
   }
 
   @override
@@ -639,7 +727,10 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
             ),
           ),
           const SizedBox(width: 16),
-          Icon(Icons.send_outlined, size: 26, color: AppColors.textDark),
+          GestureDetector(
+            onTap: _sharePost,
+            child: Icon(Icons.send_outlined, size: 26, color: AppColors.textDark),
+          ),
           const Spacer(),
           GestureDetector(
             onTap: () => setState(() => _isSaved = !_isSaved),

@@ -944,7 +944,10 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
             ),
           ),
           const SizedBox(width: 16),
-          Icon(Icons.send_outlined, size: 26, color: AppColors.textDark),
+          GestureDetector(
+            onTap: _shareProject,
+            child: Icon(Icons.send_outlined, size: 26, color: AppColors.textDark),
+          ),
           const Spacer(),
           GestureDetector(
             onTap: () => setState(() => _isSaved = !_isSaved),
