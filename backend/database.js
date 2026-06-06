@@ -121,6 +121,7 @@ async function initDatabase() {
       CREATE TABLE IF NOT EXISTS chats (
         id TEXT PRIMARY KEY,
         participant_ids TEXT NOT NULL,
+        is_group INTEGER DEFAULT 0,
         last_message TEXT,
         last_message_type TEXT DEFAULT 'text',
         last_sender_id TEXT,
@@ -128,6 +129,7 @@ async function initDatabase() {
         created_at BIGINT DEFAULT EXTRACT(EPOCH FROM NOW()) * 1000
       )
     `);
+    await client.query(`ALTER TABLE chats ADD COLUMN IF NOT EXISTS is_group INTEGER DEFAULT 0`);
 
     // Chat unread table
     await client.query(`

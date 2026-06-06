@@ -88,6 +88,7 @@ class SmartImage extends StatelessWidget {
   }
 
   Widget _defaultPlaceholder() {
+    final iconSize = (width?.isFinite == true ? width! : 40.0) * 0.5;
     return Container(
       width: width,
       height: height,
@@ -95,7 +96,7 @@ class SmartImage extends StatelessWidget {
       child: Center(
         child: Icon(
           Icons.image_outlined,
-          size: (width ?? 40) * 0.5,
+          size: iconSize,
           color: AppColors.textDarkSecondary,
         ),
       ),
@@ -103,6 +104,7 @@ class SmartImage extends StatelessWidget {
   }
 
   Widget _defaultErrorWidget() {
+    final iconSize = (width?.isFinite == true ? width! : 40.0) * 0.5;
     return Container(
       width: width,
       height: height,
@@ -110,7 +112,7 @@ class SmartImage extends StatelessWidget {
       child: Center(
         child: Icon(
           Icons.broken_image_outlined,
-          size: (width ?? 40) * 0.5,
+          size: iconSize,
           color: AppColors.textDarkSecondary,
         ),
       ),

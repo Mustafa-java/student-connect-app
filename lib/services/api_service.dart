@@ -1160,6 +1160,17 @@ class ApiService {
 
   /// ==================== NOTIFICATIONS ====================
 
+  Future<int> getUnreadNotificationsCount() async {
+    try {
+      final response = await _dio.get('/api/notifications/unread-count');
+      final data = response.data as Map<String, dynamic>;
+      return data['count'] as int? ?? 0;
+    } catch (e) {
+      debugPrint('getUnreadNotificationsCount error: $e');
+      return 0;
+    }
+  }
+
   Future<List<Map<String, dynamic>>> getNotifications() async {
     try {
       final response = await _dio.get('/api/notifications');
@@ -1202,6 +1213,16 @@ class ApiService {
       return response.statusCode == 200;
     } catch (e) {
       debugPrint('removeTeamMember error: $e');
+      return false;
+    }
+  }
+
+  Future<bool> deleteChat(String chatId) async {
+    try {
+      final response = await _dio.post('/api/chats/$chatId/delete');
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('deleteChat error: $e');
       return false;
     }
   }

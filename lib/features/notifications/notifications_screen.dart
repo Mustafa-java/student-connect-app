@@ -1,3 +1,4 @@
+import 'dart:convert' as convert;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -33,9 +34,21 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     }
   }
 
+  Map<String, dynamic>? _parseNotificationData(
+      Map<String, dynamic> notification) {
+    final rawData = notification['data'];
+    if (rawData is Map<String, dynamic>) return rawData;
+    if (rawData is String) {
+      try {
+        return convert.jsonDecode(rawData) as Map<String, dynamic>;
+      } catch (_) {}
+    }
+    return null;
+  }
+
   Future<void> _handleTeamInvite(
       Map<String, dynamic> notification, bool accept) async {
-    final data = notification['data'] as Map<String, dynamic>?;
+    final data = _parseNotificationData(notification);
     if (data == null) return;
 
     final invitationId = data['invitation_id']?.toString();
@@ -162,7 +175,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
 
   Widget _buildNotificationTile(Map<String, dynamic> notification, int index) {
     final type = notification['type']?.toString() ?? '';
-    final data = notification['data'] as Map<String, dynamic>?;
+    final data = _parseNotificationData(notification);
 
     if (type == 'team_invite') {
       final teamName = data?['team_name']?.toString() ?? 'команду';

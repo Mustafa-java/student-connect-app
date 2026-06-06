@@ -1326,8 +1326,8 @@ app.post('/api/teams', authMiddleware, async (req, res) => {
     // Создаем групповой чат для команды
     const participantIds = JSON.stringify(members);
     await pool.query(
-      'INSERT INTO chats (id, participant_ids, last_message, last_sender_id, last_message_at) VALUES ($1, $2, $3, $4, $5)',
-      [chatId, participantIds, 'Команда создана', req.userId, Date.now()]
+      'INSERT INTO chats (id, participant_ids, is_group, last_message, last_sender_id, last_message_at) VALUES ($1, $2, $3, $4, $5, $6)',
+      [chatId, participantIds, 1, 'Команда создана', req.userId, Date.now()]
     );
     
     // Создаем команду
@@ -1578,8 +1578,8 @@ app.get('/api/notifications', authMiddleware, async (req, res) => {
       `SELECT n.*, u.name as from_user_name, u.avatar_url as from_user_avatar,
               t.name as team_name
        FROM notifications n
-       LEFT JOIN users u ON u.id = n.data::jsonb->>'from_user_id'
-       LEFT JOIN teams t ON t.id = n.data::jsonb->>'team_id'
+       LEFT JOIN users u ON u.id = COALESCE(n.data, '{}')::jsonb->>'from_user_id'
+       LEFT JOIN teams t ON t.id = COALESCE(n.data, '{}')::jsonb->>'team_id'
        WHERE n.user_id = $1
        ORDER BY n.created_at DESC LIMIT 50`,
       [req.userId]
@@ -1706,6 +1706,53 @@ app.post('/api/team-invitations/:id/reject', authMiddleware, async (req, res) =>
   } catch(e) {
     console.error('Reject invitation error:', e);
     res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+// Удалить чат (для пользователя)
+app.post('/api/chats/:chatId/delete', authMiddleware, async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    
+    // Проверяем что пользователь участник чата
+    const chatResult = await pool.query('SELECT * FROM chats WHERE id = $1', [chatId]);
+    if (chatResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Чат не найден' });
+    }
+    
+    const chat = chatResult.rows[0];
+    const participantIds = parseParticipantIds(chat.participant_ids);
+    
+    if (!participantIds.includes(req.userId)) {
+      return res.status(403).json({ error: 'Вы не участник чата' });
+    }
+    
+    // Для группового чата — удаляем пользователя из участников
+    // Если после этого участников не осталось, удаляем чат полностью
+    if (chat.is_group) {
+      const updatedParticipants = participantIds.filter(id => id !== req.userId);
+      if (updatedParticipants.length === 0) {
+        // Удаляем все сообщения и сам чат
+        await pool.query('DELETE FROM messages WHERE chat_id = $1', [chatId]);
+        await pool.query('DELETE FROM chat_unread WHERE chat_id = $1', [chatId]);
+        await pool.query('DELETE FROM chats WHERE id = $1', [chatId]);
+      } else {
+        await pool.query('UPDATE chats SET participant_ids = $1 WHERE id = $2',
+          [JSON.stringify(updatedParticipants), chatId]);
+        await pool.query('DELETE FROM chat_unread WHERE chat_id = $1 AND user_id = $2',
+          [chatId, req.userId]);
+      }
+    } else {
+      // Для личного чата — удаляем полностью (оба участника видят удаление)
+      await pool.query('DELETE FROM messages WHERE chat_id = $1', [chatId]);
+      await pool.query('DELETE FROM chat_unread WHERE chat_id = $1', [chatId]);
+      await pool.query('DELETE FROM chats WHERE id = $1', [chatId]);
+    }
+    
+    res.json({ ok: true });
+  } catch(e) {
+    console.error('Delete chat error:', e);
+    res.status(500).json({ error: 'Ошибка удаления чата' });
   }
 });
 

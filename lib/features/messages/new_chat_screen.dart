@@ -30,39 +30,64 @@ class _NewChatScreenState extends ConsumerState<NewChatScreen> {
   }
 
   Future<void> _loadUsers() async {
-    setState(() { _isLoading = true; _error = ''; });
+    setState(() {
+      _isLoading = true;
+      _error = '';
+    });
     try {
       final users = await ApiService.instance.getAllUsers();
-      setState(() { _users = users.map((u) => _userToMap(u)).toList(); _isLoading = false; });
+      setState(() {
+        _users = users.map((u) => _userToMap(u)).toList();
+        _isLoading = false;
+      });
     } catch (e) {
-      setState(() { _error = 'Ошибка загрузки: $e'; _isLoading = false; });
+      setState(() {
+        _error = 'Ошибка загрузки: $e';
+        _isLoading = false;
+      });
     }
   }
 
   Future<void> _searchUsers(String query) async {
-    if (query.isEmpty) { _loadUsers(); return; }
+    if (query.isEmpty) {
+      _loadUsers();
+      return;
+    }
     setState(() => _isLoading = true);
     try {
       final users = await ApiService.instance.searchUsers(query);
       setState(() => _users = users.map((u) => _userToMap(u)).toList());
-    } catch (e) { setState(() => _isLoading = false); }
+    } catch (e) {
+      setState(() => _isLoading = false);
+    }
   }
 
   Map<String, dynamic> _userToMap(User u) {
     return {
-      'id': u.id, 'name': u.name, 'email': u.email,
-      'avatarUrl': u.avatarUrl, 'bio': u.bio, 'university': u.university,
-      'faculty': u.faculty, 'course': u.course, 'skills': u.skills,
-      'projectsCount': u.projectsCount, 'followersCount': u.followersCount,
-      'followingCount': u.followingCount, 'isOnline': u.isOnline,
-      'lastSeen': u.lastSeen, 'createdAt': u.createdAt,
+      'id': u.id,
+      'name': u.name,
+      'email': u.email,
+      'avatarUrl': u.avatarUrl,
+      'bio': u.bio,
+      'university': u.university,
+      'faculty': u.faculty,
+      'course': u.course,
+      'skills': u.skills,
+      'projectsCount': u.projectsCount,
+      'followersCount': u.followersCount,
+      'followingCount': u.followingCount,
+      'isOnline': u.isOnline,
+      'lastSeen': u.lastSeen,
+      'createdAt': u.createdAt,
     };
   }
 
   Future<void> _startChat(Map<String, dynamic> user) async {
     if (!mounted) return;
-    showDialog(context: context, barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()));
+    showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: CircularProgressIndicator()));
 
     try {
       final chatId = await ApiService.instance.createChat(user['id']);
@@ -70,31 +95,41 @@ class _NewChatScreenState extends ConsumerState<NewChatScreen> {
       Navigator.pop(context);
 
       final otherUser = User(
-        id: user['id'], name: user['name'] ?? 'Пользователь',
-        email: user['email'] ?? '', avatarUrl: user['avatarUrl'],
-        bio: user['bio'], university: user['university'],
-        faculty: user['faculty'], course: user['course'],
+        id: user['id'],
+        name: user['name'] ?? 'Пользователь',
+        email: user['email'] ?? '',
+        avatarUrl: user['avatarUrl'],
+        bio: user['bio'],
+        university: user['university'],
+        faculty: user['faculty'],
+        course: user['course'],
         skills: user['skills'] is List ? List<String>.from(user['skills']) : [],
         projectsCount: user['projectsCount'] ?? 0,
         followersCount: user['followersCount'] ?? 0,
         followingCount: user['followingCount'] ?? 0,
         isOnline: user['isOnline'] ?? false,
         lastSeen: user['lastSeen'],
-        createdAt: user['createdAt'] is DateTime ? user['createdAt'] : DateTime.now(),
+        createdAt:
+            user['createdAt'] is DateTime ? user['createdAt'] : DateTime.now(),
       );
 
       final chat = Chat(
-        id: chatId, currentUser: otherUser, lastMessage: null,
-        unreadCount: 0, isOnline: otherUser.isOnline,
-        lastMessageAt: null, createdAt: DateTime.now(),
+        id: chatId,
+        currentUser: otherUser,
+        lastMessage: null,
+        unreadCount: 0,
+        isOnline: otherUser.isOnline,
+        lastMessageAt: null,
+        createdAt: DateTime.now(),
       );
 
-      Navigator.pushReplacement(context, slideTransition(ChatScreen(chat: chat)));
+      Navigator.pushReplacement(
+          context, slideTransition(ChatScreen(chat: chat)));
     } catch (e) {
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: $e'), backgroundColor: AppColors.error));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Ошибка: $e'), backgroundColor: AppColors.error));
       }
     }
   }
@@ -225,9 +260,8 @@ class _NewChatScreenState extends ConsumerState<NewChatScreen> {
       bio: user['bio'],
       university: user['university'],
       isOnline: user['isOnline'] ?? false,
-      lastSeen: user['lastSeen'] != null
-          ? (user['lastSeen'] as dynamic).toDate()
-          : null,
+      lastSeen:
+          user['lastSeen'] is DateTime ? user['lastSeen'] as DateTime? : null,
       createdAt: DateTime.now(),
       skills: user['skills'] != null ? List<String>.from(user['skills']) : [],
       projectsCount: 0,

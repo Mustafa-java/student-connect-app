@@ -325,16 +325,10 @@ final chatsStreamProvider = StreamProvider<List<Chat>>((ref) {
         return;
       }
       final chatDataList = await ApiService.instance.getChats();
-      debugPrint('chatsStreamProvider: received ${chatDataList.length} chats');
-      final chats = chatDataList.map((data) {
-        debugPrint(
-            'Parsing chat: ${data['id']}, last_message_at type: ${data['last_message_at'].runtimeType}');
-        return _parseChat(data);
-      }).toList();
+      final chats = chatDataList.map((data) => _parseChat(data)).toList();
       if (!controller.isClosed) controller.add(chats);
-    } catch (e, stackTrace) {
+    } catch (e) {
       debugPrint('chatsStreamProvider error: $e');
-      debugPrint('Stack trace: $stackTrace');
       if (!controller.isClosed) controller.add([]);
     }
   }
@@ -410,24 +404,14 @@ Chat _parseChat(Map<String, dynamic> data) {
 
 /// Универсальный парсер timestamp (поддерживает int, String, null)
 DateTime _parseTimestamp(dynamic value) {
-  debugPrint(
-      '_parseTimestamp called with value: $value (type: ${value.runtimeType})');
   if (value == null) return DateTime.now();
   if (value is int) return DateTime.fromMillisecondsSinceEpoch(value);
   if (value is String) {
     final parsed = int.tryParse(value);
-    if (parsed != null) {
-      debugPrint('_parseTimestamp: parsed String to int: $parsed');
-      return DateTime.fromMillisecondsSinceEpoch(parsed);
-    }
-    // Попытка парсить ISO8601
+    if (parsed != null) return DateTime.fromMillisecondsSinceEpoch(parsed);
     final dateTime = DateTime.tryParse(value);
-    if (dateTime != null) {
-      debugPrint('_parseTimestamp: parsed as ISO8601: $dateTime');
-      return dateTime;
-    }
+    if (dateTime != null) return dateTime;
   }
-  debugPrint('_parseTimestamp: fallback to DateTime.now()');
   return DateTime.now();
 }
 

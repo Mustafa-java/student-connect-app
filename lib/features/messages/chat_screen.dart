@@ -158,17 +158,28 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             IconButton(
               icon: const Icon(Icons.info_outline),
               onPressed: _showGroupInfo,
-            )
-          else ...[
-            IconButton(
-              icon: const Icon(Icons.phone_outlined),
-              onPressed: () {},
             ),
-            IconButton(
-              icon: const Icon(Icons.videocam_outlined),
-              onPressed: () {},
-            ),
-          ],
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            color: AppColors.surfaceDark,
+            onSelected: (value) {
+              if (value == 'delete') _deleteChat();
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'delete',
+                child: Row(
+                  children: [
+                    Icon(Icons.delete_outline,
+                        color: AppColors.error, size: 18),
+                    SizedBox(width: 8),
+                    Text('Удалить чат',
+                        style: TextStyle(color: AppColors.error)),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ],
       ),
       body: Column(
@@ -388,6 +399,57 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         );
       },
     );
+  }
+
+  Future<void> _deleteChat() async {
+    final isGroupChat = widget.chat.isGroup;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surfaceDark,
+        title: const Text('Удалить чат?',
+            style: TextStyle(color: AppColors.textDark)),
+        content: Text(
+          isGroupChat
+              ? 'Вы покинете групповой чат. История будет удалена.'
+              : 'Чат будет удалён без возможности восстановления.',
+          style: const TextStyle(color: AppColors.textDarkSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Отмена'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            child: const Text('Удалить'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    final success = await ApiService.instance.deleteChat(widget.chat.id);
+    if (mounted) {
+      if (success) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Чат удалён'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Ошибка удаления чата'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildMessageBubble(Message message, bool isMe) {

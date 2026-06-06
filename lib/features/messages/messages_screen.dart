@@ -6,6 +6,7 @@ import '../../core/utils/page_transitions.dart';
 import '../../core/widgets/custom_avatar.dart';
 import '../../providers/app_providers.dart';
 import '../../models/models.dart';
+import '../../services/api_service.dart';
 import 'chat_screen.dart';
 import 'new_chat_screen.dart';
 
@@ -206,6 +207,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
             slideTransition(ChatScreen(chat: chat)),
           );
         },
+        onLongPress: () => _showChatOptions(chat, context),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Row(
@@ -298,11 +300,92 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                   ],
                 ),
               ),
+              IconButton(
+                icon: Icon(Icons.delete_outline,
+                    size: 18, color: AppColors.textDarkSecondary),
+                onPressed: () => _showChatOptions(chat, context),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
             ],
           ),
         ),
       ),
     ).animate().fadeIn(duration: const Duration(milliseconds: 250));
+  }
+
+  Future<void> _showChatOptions(Chat chat, BuildContext context) async {
+    final result = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: AppColors.surfaceDark,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(top: 10, bottom: 16),
+              decoration: BoxDecoration(
+                color: AppColors.textDarkSecondary.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: AppColors.error),
+              title: const Text('Удалить чат',
+                  style: TextStyle(color: AppColors.error)),
+              onTap: () => Navigator.pop(ctx, 'delete'),
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+
+    if (result == 'delete' && mounted) {
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: AppColors.surfaceDark,
+          title: const Text('Удалить чат?',
+              style: TextStyle(color: AppColors.textDark)),
+          content: Text(
+            chat.isGroup
+                ? 'Вы покинете групповой чат.'
+                : 'Чат будет удалён без возможности восстановления.',
+            style: const TextStyle(color: AppColors.textDarkSecondary),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Отмена'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+              child: const Text('Удалить'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirm == true && mounted) {
+        final success = await ApiService.instance.deleteChat(chat.id);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(success ? 'Чат удалён' : 'Ошибка удаления чата'),
+              backgroundColor: success ? AppColors.success : AppColors.error,
+            ),
+          );
+          if (success) ref.invalidate(chatsStreamProvider);
+        }
+      }
+    }
   }
 
   Widget _buildEmptyState() {

@@ -34,8 +34,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Future<void> _fetchUnreadNotifications() async {
     try {
-      final response = await ApiService.instance.getNotifications();
-      final unread = response.where((n) => n['is_read'] != true).length;
+      final unread = await ApiService.instance.getUnreadNotificationsCount();
       if (mounted) setState(() => _unreadNotifications = unread);
     } catch (_) {}
   }
