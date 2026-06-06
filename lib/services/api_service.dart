@@ -428,6 +428,19 @@ class ApiService {
     }
   }
 
+  Future<Post> updatePost({
+    required String postId,
+    String? content,
+    List<String> tags = const [],
+  }) async {
+    final response = await _dio.put('/api/posts/$postId', data: {
+      'content': content,
+      'tags': tags,
+    });
+    final data = response.data as Map<String, dynamic>;
+    return _parsePost(data['post'] as Map<String, dynamic>);
+  }
+
   /// ==================== COMMENTS ====================
 
   Future<List<Comment>> getComments(String postId) async {
@@ -537,6 +550,23 @@ class ApiService {
       debugPrint('deleteProject error: $e');
       return false;
     }
+  }
+
+  Future<Project> updateProject({
+    required String projectId,
+    required String title,
+    required String description,
+    List<String> skills = const [],
+    String status = 'idea',
+  }) async {
+    final response = await _dio.put('/api/projects/$projectId', data: {
+      'title': title,
+      'description': description,
+      'skills': skills,
+      'status': status,
+    });
+    final data = response.data as Map<String, dynamic>;
+    return _parseProject(data['project'] as Map<String, dynamic>);
   }
 
   Future<Map<String, dynamic>> uploadProjectZip(

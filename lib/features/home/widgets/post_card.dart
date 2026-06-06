@@ -105,8 +105,9 @@ class _PostCardState extends State<PostCard>
                 // Likes
                 Consumer(
                   builder: (context, ref, _) {
-                    final likesState = ref.watch(postLikesProvider(widget.post.id));
-                    final totalLikes = widget.post.likesCount + 
+                    final likesState =
+                        ref.watch(postLikesProvider(widget.post.id));
+                    final totalLikes = widget.post.likesCount +
                         (likesState.isLikedByCurrentUser ? 1 : 0) -
                         (widget.post.isLiked ? 1 : 0);
                     if (totalLikes > 0)
@@ -399,7 +400,8 @@ class _PostCardState extends State<PostCard>
           Consumer(
             builder: (context, ref, child) {
               final currentUser = ref.watch(currentUserProvider);
-              final isMyPost = currentUser != null && author.id == currentUser.id;
+              final isMyPost =
+                  currentUser != null && author.id == currentUser.id;
               return IconButton(
                 icon: const Icon(Icons.more_horiz, size: 20),
                 onPressed: () => _showOptionsMenu(currentUser),
@@ -495,7 +497,9 @@ class _PostCardState extends State<PostCard>
               GestureDetector(
                 onTap: () {
                   if (currentUser == null) return;
-                  ref.read(postLikesProvider(post.id).notifier).toggleLike(currentUser.id);
+                  ref
+                      .read(postLikesProvider(post.id).notifier)
+                      .toggleLike(currentUser.id);
                   setState(() {
                     _showHeartAnimation = true;
                   });
@@ -512,9 +516,13 @@ class _PostCardState extends State<PostCard>
                   duration: const Duration(milliseconds: 150),
                   curve: Curves.easeOut,
                   child: Icon(
-                    likesState.isLikedByCurrentUser ? Icons.favorite : Icons.favorite_border,
+                    likesState.isLikedByCurrentUser
+                        ? Icons.favorite
+                        : Icons.favorite_border,
                     size: 24,
-                    color: likesState.isLikedByCurrentUser ? AppColors.error : AppColors.textDark,
+                    color: likesState.isLikedByCurrentUser
+                        ? AppColors.error
+                        : AppColors.textDark,
                   ),
                 ),
               ),
@@ -574,6 +582,99 @@ class _PostCardState extends State<PostCard>
     );
   }
 
+  Future<void> _editPost() async {
+    final contentController = TextEditingController(text: widget.post.content);
+    final tagsController =
+        TextEditingController(text: widget.post.tags.join(', '));
+
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.surfaceDark,
+        title: const Text('Редактировать пост',
+            style: TextStyle(color: AppColors.textDark)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: contentController,
+              maxLines: 5,
+              style: const TextStyle(color: AppColors.textDark),
+              decoration: const InputDecoration(
+                labelText: 'Текст поста',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: tagsController,
+              style: const TextStyle(color: AppColors.textDark),
+              decoration: const InputDecoration(
+                labelText: 'Теги (через запятую)',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Отмена'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final tags = tagsController.text
+                  .split(',')
+                  .map((t) => t.trim())
+                  .where((t) => t.isNotEmpty)
+                  .toList();
+              Navigator.pop(context, {
+                'content': contentController.text,
+                'tags': tags,
+              });
+            },
+            child: const Text('Сохранить'),
+          ),
+        ],
+      ),
+    );
+
+    if (result != null && mounted) {
+      try {
+        await ApiService.instance.updatePost(
+          postId: widget.post.id,
+          content: result['content'],
+          tags: result['tags'],
+        );
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Пост обновлён'),
+              backgroundColor: AppColors.success,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+
+          final ref = ProviderScope.containerOf(context, listen: false);
+          ref.invalidate(postsStreamProvider);
+          ref.invalidate(followingPostsStreamProvider);
+          ref.invalidate(postsProvider);
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Не удалось обновить пост'),
+              backgroundColor: AppColors.error,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    }
+  }
+
   Future<void> _deletePost() async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -605,7 +706,7 @@ class _PostCardState extends State<PostCard>
 
     if (confirm == true && mounted) {
       final success = await ApiService.instance.deletePost(widget.post.id);
-      
+
       if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -614,7 +715,7 @@ class _PostCardState extends State<PostCard>
             behavior: SnackBarBehavior.floating,
           ),
         );
-        
+
         // Обновляем ленту
         if (mounted) {
           final ref = ProviderScope.containerOf(context, listen: false);
@@ -661,7 +762,8 @@ class _PostCardState extends State<PostCard>
   }
 
   void _showOptionsMenu(User? currentUser) {
-    final isMyPost = currentUser != null && widget.post.author.id == currentUser.id;
+    final isMyPost =
+        currentUser != null && widget.post.author.id == currentUser.id;
 
     showModalBottomSheet(
       context: context,
@@ -684,7 +786,18 @@ class _PostCardState extends State<PostCard>
             ),
             if (isMyPost)
               ListTile(
-                leading: const Icon(Icons.delete_outline, color: AppColors.error),
+                leading:
+                    const Icon(Icons.edit_outlined, color: AppColors.primary),
+                title: const Text('Редактировать'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _editPost();
+                },
+              ),
+            if (isMyPost)
+              ListTile(
+                leading:
+                    const Icon(Icons.delete_outline, color: AppColors.error),
                 title: const Text(
                   'Удалить',
                   style: TextStyle(color: AppColors.error),
@@ -756,9 +869,8 @@ class _PostCardState extends State<PostCard>
 
   void _shareInApp() {
     final content = widget.post.content ?? '';
-    final contentPreview = content.length > 100
-        ? '${content.substring(0, 100)}...'
-        : content;
+    final contentPreview =
+        content.length > 100 ? '${content.substring(0, 100)}...' : content;
 
     final shareText = '''
 📝 Пост от ${widget.post.author.name}
@@ -783,9 +895,8 @@ ${contentPreview.isNotEmpty ? contentPreview : 'Без текста'}
 
   void _shareExternal() {
     final content = widget.post.content ?? '';
-    final contentPreview = content.length > 100
-        ? '${content.substring(0, 100)}...'
-        : content;
+    final contentPreview =
+        content.length > 100 ? '${content.substring(0, 100)}...' : content;
 
     final shareText = '''
 Посмотри пост в Student Connect!

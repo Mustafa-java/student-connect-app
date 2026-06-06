@@ -106,6 +106,118 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     }
   }
 
+  Future<void> _editProject() async {
+    final titleController = TextEditingController(text: _project.title);
+    final descController = TextEditingController(text: _project.description);
+    final skillsController =
+        TextEditingController(text: _project.skills.join(', '));
+    String selectedStatus = _project.status;
+
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.surfaceDark,
+        title: const Text('Редактировать проект',
+            style: TextStyle(color: AppColors.textDark)),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: titleController,
+                style: const TextStyle(color: AppColors.textDark),
+                decoration: const InputDecoration(
+                  labelText: 'Название',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: descController,
+                maxLines: 3,
+                style: const TextStyle(color: AppColors.textDark),
+                decoration: const InputDecoration(
+                  labelText: 'Описание',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: skillsController,
+                style: const TextStyle(color: AppColors.textDark),
+                decoration: const InputDecoration(
+                  labelText: 'Навыки (через запятую)',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Отмена'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final skills = skillsController.text
+                  .split(',')
+                  .map((s) => s.trim())
+                  .where((s) => s.isNotEmpty)
+                  .toList();
+              Navigator.pop(context, {
+                'title': titleController.text,
+                'description': descController.text,
+                'skills': skills,
+                'status': selectedStatus,
+              });
+            },
+            child: const Text('Сохранить'),
+          ),
+        ],
+      ),
+    );
+
+    if (result != null && mounted) {
+      try {
+        final updatedProject = await ApiService.instance.updateProject(
+          projectId: _project.id,
+          title: result['title'],
+          description: result['description'],
+          skills: result['skills'],
+          status: result['status'],
+        );
+
+        setState(() {
+          _project = updatedProject;
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Проект обновлён'),
+              backgroundColor: AppColors.success,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+
+          final ref = ProviderScope.containerOf(context, listen: false);
+          ref.invalidate(projectsStreamProvider);
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Не удалось обновить проект'),
+              backgroundColor: AppColors.error,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    }
+  }
+
   Future<void> _deleteProject() async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -199,6 +311,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
   }
 
   void _handleDoubleTap() {
+    // Всегда ставим лайк при двойном тапе (как в Instagram)
     if (!_isLiked) {
       _toggleLike();
     }
@@ -1497,6 +1610,16 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
+            if (isMyProject)
+              ListTile(
+                leading:
+                    const Icon(Icons.edit_outlined, color: AppColors.primary),
+                title: const Text('Редактировать'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _editProject();
+                },
+              ),
             if (isMyProject)
               ListTile(
                 leading:

@@ -416,6 +416,57 @@ app.delete('/api/posts/:id', authMiddleware, async (req, res) => {
   }
 });
 
+app.put('/api/posts/:id', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { content, tags } = req.body;
+    
+    const postResult = await pool.query('SELECT * FROM posts WHERE id = $1', [id]);
+    
+    if (postResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Пост не найден' });
+    }
+    
+    if (postResult.rows[0].author_id !== req.userId) {
+      return res.status(403).json({ error: 'Нет доступа' });
+    }
+    
+    let tagsArray = [];
+    if (tags) {
+      try {
+        tagsArray = typeof tags === 'string' ? JSON.parse(tags) : tags;
+      } catch (e) {
+        tagsArray = [];
+      }
+    }
+    
+    await pool.query(
+      'UPDATE posts SET content = $1, tags = $2 WHERE id = $3',
+      [content || null, JSON.stringify(tagsArray), id]
+    );
+    
+    const result = await pool.query(`
+      SELECT p.*, u.name as author_name, u.email as author_email, u.avatar_url as author_avatar,
+             u.university as author_university, u.is_online as author_is_online,
+             u.skills as author_skills, u.projects_count as author_projects_count,
+             u.followers_count as author_followers_count, u.following_count as author_following_count
+      FROM posts p JOIN users u ON p.author_id = u.id WHERE p.id = $1
+    `, [id]);
+    
+    const baseUrl = getBaseUrl(req);
+    const post = result.rows[0];
+    post.images = JSON.stringify(convertImageUrls(post.images, baseUrl));
+    post.author_skills = JSON.parse(post.author_skills || '[]');
+    post.is_liked = await enrichPost(post.id, req.userId);
+    
+    console.log('Post updated:', id);
+    res.json({ post });
+  } catch(e) {
+    console.error('Update post error:', e);
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
 // ==================== COMMENTS ====================
 
 app.get('/api/posts/:id/comments', authMiddleware, async (req, res) => {
@@ -627,6 +678,58 @@ app.delete('/api/projects/:id', authMiddleware, async (req, res) => {
     res.json({ ok: true });
   } catch(e) {
     console.error('Delete project error:', e);
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+app.put('/api/projects/:id', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, description, skills, status } = req.body;
+    
+    const projectResult = await pool.query('SELECT * FROM projects WHERE id = $1', [id]);
+    
+    if (projectResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Проект не найден' });
+    }
+    
+    if (projectResult.rows[0].author_id !== req.userId) {
+      return res.status(403).json({ error: 'Нет доступа' });
+    }
+    
+    let skillsArray = [];
+    if (skills) {
+      try {
+        skillsArray = typeof skills === 'string' ? JSON.parse(skills) : skills;
+      } catch (e) {
+        skillsArray = [];
+      }
+    }
+    
+    await pool.query(
+      'UPDATE projects SET title = $1, description = $2, skills = $3, status = $4 WHERE id = $5',
+      [title || null, description || null, JSON.stringify(skillsArray), status || 'idea', id]
+    );
+    
+    const result = await pool.query(`
+      SELECT p.*, u.name as author_name, u.email as author_email, u.avatar_url as author_avatar,
+             u.university as author_university, u.is_online as author_is_online,
+             u.skills as author_skills, u.projects_count as author_projects_count,
+             u.followers_count as author_followers_count, u.following_count as author_following_count
+      FROM projects p JOIN users u ON p.author_id = u.id WHERE p.id = $1
+    `, [id]);
+    
+    const baseUrl = getBaseUrl(req);
+    const project = result.rows[0];
+    project.images = JSON.stringify(convertImageUrls(project.images, baseUrl));
+    project.author_skills = JSON.parse(project.author_skills || '[]');
+    project.team_members = JSON.parse(project.team_members || '[]');
+    project.is_liked = await enrichProject(project.id, req.userId);
+    
+    console.log('Project updated:', id);
+    res.json({ project });
+  } catch(e) {
+    console.error('Update project error:', e);
     res.status(500).json({ error: 'Ошибка' });
   }
 });
