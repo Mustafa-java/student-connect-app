@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/custom_avatar.dart';
 import '../../core/widgets/smart_image.dart';
 import '../../core/utils/page_transitions.dart';
-import '../../providers/app_providers.dart';
 import '../../models/models.dart';
+import '../../providers/app_providers.dart';
 import '../../services/api_service.dart';
+import '../messages/chat_screen.dart';
+import '../post/post_detail_screen.dart';
 import '../project/project_detail_screen.dart';
+import '../teams/team_selection_dialog.dart';
 import '../post/post_detail_screen.dart';
 import '../messages/chat_screen.dart';
 import 'followers_screen.dart';
@@ -24,10 +26,12 @@ class OtherUserProfileScreen extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<OtherUserProfileScreen> createState() => _OtherUserProfileScreenState();
+  ConsumerState<OtherUserProfileScreen> createState() =>
+      _OtherUserProfileScreenState();
 }
 
-class _OtherUserProfileScreenState extends ConsumerState<OtherUserProfileScreen> {
+class _OtherUserProfileScreenState
+    extends ConsumerState<OtherUserProfileScreen> {
   bool _isFollowing = false;
   bool _isLoadingFollowStatus = true;
   String? _chatId;
@@ -92,7 +96,8 @@ class _OtherUserProfileScreenState extends ConsumerState<OtherUserProfileScreen>
     });
 
     try {
-      final isFollowing = await ApiService.instance.toggleFollow(widget.user.id);
+      final isFollowing =
+          await ApiService.instance.toggleFollow(widget.user.id);
       if (mounted) {
         setState(() {
           _isFollowing = isFollowing;
@@ -170,6 +175,14 @@ class _OtherUserProfileScreenState extends ConsumerState<OtherUserProfileScreen>
     }
   }
 
+  void _inviteToTeam() {
+    showTeamSelectionDialog(
+      context: context,
+      userId: widget.user.id,
+      userName: widget.user.name,
+    );
+  }
+
   Chat _parseChat(Map<String, dynamic> data) {
     final otherUser = data['other_user'] as Map<String, dynamic>?;
     final user = otherUser != null
@@ -235,14 +248,21 @@ class _OtherUserProfileScreenState extends ConsumerState<OtherUserProfileScreen>
         initialIndex: 0,
         child: projectsAsync.when(
           data: (allProjects) {
-            final userProjects = allProjects.where((p) => p.author.id == widget.user.id).toList();
+            final userProjects = allProjects
+                .where((p) => p.author.id == widget.user.id)
+                .toList();
             return postsAsync.when(
               data: (allPosts) {
-                final userPosts = allPosts.where((p) => p.author.id == widget.user.id).toList();
-                return _buildProfileContent(currentUser, userPosts, userProjects);
+                final userPosts = allPosts
+                    .where((p) => p.author.id == widget.user.id)
+                    .toList();
+                return _buildProfileContent(
+                    currentUser, userPosts, userProjects);
               },
-              loading: () => _buildProfileContent(currentUser, [], userProjects),
-              error: (_, __) => _buildProfileContent(currentUser, [], userProjects),
+              loading: () =>
+                  _buildProfileContent(currentUser, [], userProjects),
+              error: (_, __) =>
+                  _buildProfileContent(currentUser, [], userProjects),
             );
           },
           loading: () => const Scaffold(
@@ -255,7 +275,8 @@ class _OtherUserProfileScreenState extends ConsumerState<OtherUserProfileScreen>
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.error_outline, size: 60, color: AppColors.error),
+                  const Icon(Icons.error_outline,
+                      size: 60, color: AppColors.error),
                   const SizedBox(height: 16),
                   Text(
                     'Ошибка загрузки данных',
@@ -328,11 +349,17 @@ class _OtherUserProfileScreenState extends ConsumerState<OtherUserProfileScreen>
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
-                          _buildStatItem('${widget.user.projectsCount}', 'Проекты', onTap: null),
-                          _buildStatItem('${widget.user.followersCount}', 'Подп.',
-                            onTap: () => _openFollowersScreen(showFollowers: true)),
-                          _buildStatItem('${widget.user.followingCount}', 'Подписки',
-                            onTap: () => _openFollowersScreen(showFollowers: false)),
+                          _buildStatItem(
+                              '${widget.user.projectsCount}', 'Проекты',
+                              onTap: null),
+                          _buildStatItem(
+                              '${widget.user.followersCount}', 'Подп.',
+                              onTap: () =>
+                                  _openFollowersScreen(showFollowers: true)),
+                          _buildStatItem(
+                              '${widget.user.followingCount}', 'Подписки',
+                              onTap: () =>
+                                  _openFollowersScreen(showFollowers: false)),
                         ],
                       ),
                     ),
@@ -385,7 +412,9 @@ class _OtherUserProfileScreenState extends ConsumerState<OtherUserProfileScreen>
                     Expanded(
                       child: _buildActionButton(
                         text: _isFollowing ? 'Отписаться' : 'Подписаться',
-                        icon: _isFollowing ? Icons.person_remove : Icons.person_add,
+                        icon: _isFollowing
+                            ? Icons.person_remove
+                            : Icons.person_add,
                         onPressed: _toggleFollow,
                         isPrimary: _isFollowing,
                       ),
@@ -401,6 +430,17 @@ class _OtherUserProfileScreenState extends ConsumerState<OtherUserProfileScreen>
                     ),
                   ],
                 ),
+                const SizedBox(height: 8),
+                // Кнопка приглашения в команду
+                SizedBox(
+                  width: double.infinity,
+                  child: _buildActionButton(
+                    text: 'Пригласить в команду',
+                    icon: Icons.group_add,
+                    onPressed: _inviteToTeam,
+                    isPrimary: false,
+                  ),
+                ),
                 // Навыки
                 if (widget.user.skills.isNotEmpty) ...[
                   const SizedBox(height: 16),
@@ -413,7 +453,8 @@ class _OtherUserProfileScreenState extends ConsumerState<OtherUserProfileScreen>
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 12, vertical: 6),
                               decoration: BoxDecoration(
-                                color: AppColors.primary.withValues(alpha: 0.12),
+                                color:
+                                    AppColors.primary.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(16),
                               ),
                               child: Text(
@@ -489,7 +530,8 @@ class _OtherUserProfileScreenState extends ConsumerState<OtherUserProfileScreen>
               : SliverPadding(
                   padding: const EdgeInsets.all(2),
                   sliver: SliverGrid(
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 3,
                       crossAxisSpacing: 2,
                       mainAxisSpacing: 2,
@@ -520,15 +562,19 @@ class _OtherUserProfileScreenState extends ConsumerState<OtherUserProfileScreen>
                   const SizedBox(height: 16),
                   _buildInfoRow(Icons.person_outline, 'Имя', widget.user.name),
                   if (widget.user.email.isNotEmpty)
-                    _buildInfoRow(Icons.email_outlined, 'Email', widget.user.email),
+                    _buildInfoRow(
+                        Icons.email_outlined, 'Email', widget.user.email),
                   if (widget.user.bio != null && widget.user.bio!.isNotEmpty)
                     _buildInfoRow(Icons.edit_outlined, 'Био', widget.user.bio!),
                   if (widget.user.university != null)
-                    _buildInfoRow(Icons.school_outlined, 'Университет', widget.user.university!),
+                    _buildInfoRow(Icons.school_outlined, 'Университет',
+                        widget.user.university!),
                   if (widget.user.faculty != null)
-                    _buildInfoRow(Icons.menu_book_outlined, 'Факультет', widget.user.faculty!),
+                    _buildInfoRow(Icons.menu_book_outlined, 'Факультет',
+                        widget.user.faculty!),
                   if (widget.user.course != null)
-                    _buildInfoRow(Icons.calendar_today_outlined, 'Курс', widget.user.course!),
+                    _buildInfoRow(Icons.calendar_today_outlined, 'Курс',
+                        widget.user.course!),
                   const SizedBox(height: 16),
                   const Text(
                     'Навыки',
@@ -546,7 +592,8 @@ class _OtherUserProfileScreenState extends ConsumerState<OtherUserProfileScreen>
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 12, vertical: 6),
                               decoration: BoxDecoration(
-                                color: AppColors.primary.withValues(alpha: 0.12),
+                                color:
+                                    AppColors.primary.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(16),
                               ),
                               child: Text(
@@ -578,7 +625,8 @@ class _OtherUserProfileScreenState extends ConsumerState<OtherUserProfileScreen>
     bool isPrimary = false,
   }) {
     return ElevatedButton.icon(
-      onPressed: _isLoadingFollowStatus && text.contains('Подпис') ? null : onPressed,
+      onPressed:
+          _isLoadingFollowStatus && text.contains('Подпис') ? null : onPressed,
       icon: _isLoadingFollowStatus && text.contains('Подпис')
           ? const SizedBox(
               width: 16,

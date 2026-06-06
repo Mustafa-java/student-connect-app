@@ -139,6 +139,7 @@ class Chat extends Equatable {
   final bool isOnline;
   final DateTime? lastMessageAt;
   final DateTime createdAt;
+  final String participantIds; // Список ID участников через запятую
 
   const Chat({
     required this.id,
@@ -148,6 +149,7 @@ class Chat extends Equatable {
     this.isOnline = false,
     this.lastMessageAt,
     required this.createdAt,
+    this.participantIds = '',
   });
 
   @override
@@ -159,6 +161,7 @@ class Chat extends Equatable {
         isOnline,
         lastMessageAt,
         createdAt,
+        participantIds,
       ];
 
   Chat copyWith({
@@ -169,6 +172,7 @@ class Chat extends Equatable {
     bool? isOnline,
     DateTime? lastMessageAt,
     DateTime? createdAt,
+    String? participantIds,
   }) {
     return Chat(
       id: id ?? this.id,
@@ -178,6 +182,7 @@ class Chat extends Equatable {
       isOnline: isOnline ?? this.isOnline,
       lastMessageAt: lastMessageAt ?? this.lastMessageAt,
       createdAt: createdAt ?? this.createdAt,
+      participantIds: participantIds ?? this.participantIds,
     );
   }
 
@@ -216,7 +221,7 @@ class Chat extends Equatable {
     if (lastMessage == null) {
       return 'Нет сообщений';
     }
-    
+
     switch (lastMessage!.type) {
       case MessageType.text:
         return lastMessage!.content;
@@ -238,10 +243,10 @@ class Chat extends Equatable {
     if (lastMessageAt == null) {
       return '';
     }
-    
+
     final now = DateTime.now();
     final diff = now.difference(lastMessageAt!);
-    
+
     if (diff.inMinutes < 1) {
       return 'Только что';
     } else if (diff.inHours < 1) {

@@ -402,6 +402,7 @@ Chat _parseChat(Map<String, dynamic> data) {
     isOnline: _toBool(data['is_online']),
     lastMessageAt: _parseTimestampNullable(data['last_message_at']),
     createdAt: _parseTimestamp(data['created_at']),
+    participantIds: data['participant_ids'] ?? '',
   );
 }
 
