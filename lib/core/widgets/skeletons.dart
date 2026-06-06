@@ -157,55 +157,92 @@ class MessageListSkeleton extends StatelessWidget {
     return ListView.builder(
       itemCount: 8,
       itemBuilder: (context, index) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            children: [
-              Shimmer.fromColors(
-                baseColor: AppColors.skeleton,
-                highlightColor: AppColors.skeletonHighlight,
-                child: const CircleAvatar(
-                  radius: 28,
-                  backgroundColor: Colors.white,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Shimmer.fromColors(
-                      baseColor: AppColors.skeleton,
-                      highlightColor: AppColors.skeletonHighlight,
-                      child: Container(
-                        width: 120,
-                        height: 14,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Shimmer.fromColors(
-                      baseColor: AppColors.skeleton,
-                      highlightColor: AppColors.skeletonHighlight,
-                      child: Container(
-                        width: double.infinity,
-                        height: 12,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+        return Shimmer.fromColors(
+          baseColor: AppColors.skeleton,
+          highlightColor: AppColors.skeletonHighlight,
+          child: Container(
+            color: Colors.white,
           ),
         );
       },
+    );
+  }
+}
+
+/// Skeleton для карточки поста
+class PostCardSkeleton extends StatelessWidget {
+  const PostCardSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: AppColors.backgroundDark,
+        border: Border(
+          top: BorderSide(color: AppColors.divider.withValues(alpha: 0.5)),
+          bottom: BorderSide(color: AppColors.divider.withValues(alpha: 0.5)),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                _buildCircleSkeleton(20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildLineSkeleton(width: 120, height: 13),
+                      const SizedBox(height: 4),
+                      _buildLineSkeleton(width: 80, height: 11),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Shimmer.fromColors(
+            baseColor: AppColors.skeleton,
+            highlightColor: AppColors.skeletonHighlight,
+            child: Container(height: 350, width: double.infinity, color: Colors.white),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              children: [
+                _buildLineSkeleton(width: double.infinity, height: 14),
+                const SizedBox(height: 6),
+                _buildLineSkeleton(width: 200, height: 14),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCircleSkeleton(double radius) {
+    return Shimmer.fromColors(
+      baseColor: AppColors.skeleton,
+      highlightColor: AppColors.skeletonHighlight,
+      child: CircleAvatar(radius: radius, backgroundColor: Colors.white),
+    );
+  }
+
+  Widget _buildLineSkeleton({double width = 100, double height = 14}) {
+    return Shimmer.fromColors(
+      baseColor: AppColors.skeleton,
+      highlightColor: AppColors.skeletonHighlight,
+      child: Container(
+        width: width,
+        height: height,
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(4)),
+      ),
     );
   }
 }
@@ -224,7 +261,7 @@ class ProfileGridSkeleton extends StatelessWidget {
         crossAxisSpacing: 2,
         mainAxisSpacing: 2,
       ),
-      itemCount: 9,
+            itemCount: 9,
       itemBuilder: (context, index) {
         return Shimmer.fromColors(
           baseColor: AppColors.skeleton,
