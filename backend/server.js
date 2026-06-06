@@ -14,6 +14,27 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'student-connect-secret-key';
 
+// Получить базовый URL сервера
+function getBaseUrl(req) {
+  return `${req.protocol}://${req.get('host')}`;
+}
+
+// Конвертировать пути изображений в полные URL
+function convertImageUrls(images, baseUrl) {
+  if (!images) return [];
+  try {
+    const imageArray = typeof images === 'string' ? JSON.parse(images) : images;
+    return imageArray.map(img => {
+      if (img.startsWith('/uploads/')) {
+        return `${baseUrl}${img}`;
+      }
+      return img;
+    });
+  } catch (e) {
+    return [];
+  }
+}
+
 // Создаём папку uploads если нет
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
 if (!fs.existsSync(UPLOADS_DIR)) {
@@ -284,8 +305,10 @@ app.get('/api/posts', authMiddleware, async (req, res) => {
       ORDER BY p.created_at DESC LIMIT 50
     `);
 
+    const baseUrl = getBaseUrl(req);
     const posts = await Promise.all(result.rows.map(async (p) => ({
       ...p,
+      images: JSON.stringify(convertImageUrls(p.images, baseUrl)),
       author_skills: JSON.parse(p.author_skills || '[]'),
       is_liked: await enrichPost(p.id, req.userId)
     })));
@@ -328,7 +351,9 @@ app.post('/api/posts', authMiddleware, uploadImages.array('images', 5), async (r
       FROM posts p JOIN users u ON p.author_id = u.id WHERE p.id = $1
     `, [id]);
 
+    const baseUrl = getBaseUrl(req);
     const post = result.rows[0];
+    post.images = JSON.stringify(convertImageUrls(post.images, baseUrl));
     post.author_skills = JSON.parse(post.author_skills || '[]');
     post.is_liked = await enrichPost(post.id, req.userId);
 
@@ -458,8 +483,10 @@ app.get('/api/projects', authMiddleware, async (req, res) => {
       ORDER BY p.created_at DESC LIMIT 50
     `);
 
+    const baseUrl = getBaseUrl(req);
     const projects = await Promise.all(result.rows.map(async (p) => ({
       ...p,
+      images: JSON.stringify(convertImageUrls(p.images, baseUrl)),
       author_skills: JSON.parse(p.author_skills || '[]'),
       team_members: JSON.parse(p.team_members || '[]'),
       is_liked: await enrichProject(p.id, req.userId)
@@ -520,7 +547,9 @@ app.post('/api/projects', authMiddleware, uploadImages.array('images', 5), async
       FROM projects p JOIN users u ON p.author_id = u.id WHERE p.id = $1
     `, [id]);
 
+    const baseUrl = getBaseUrl(req);
     const project = result.rows[0];
+    project.images = JSON.stringify(convertImageUrls(project.images, baseUrl));
     project.author_skills = JSON.parse(project.author_skills || '[]');
     project.team_members = JSON.parse(project.team_members || '[]');
     project.is_liked = await enrichProject(project.id, req.userId);

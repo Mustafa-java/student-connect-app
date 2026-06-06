@@ -42,7 +42,8 @@ class ApiService {
     _token = prefs.getString(_tokenKey);
     _currentUserId = prefs.getString(_userIdKey);
 
-    debugPrint('ApiService.init: token=${_token != null}, userId=$_currentUserId');
+    debugPrint(
+        'ApiService.init: token=${_token != null}, userId=$_currentUserId');
 
     if (_token != null) {
       _dio.options.headers['Authorization'] = 'Bearer $_token';
@@ -106,7 +107,9 @@ class ApiService {
     final skillsRaw = data['skills'];
     List<String> skills = [];
     if (skillsRaw is String) {
-      try { skills = List<String>.from(convert.jsonDecode(skillsRaw)); } catch(_) {}
+      try {
+        skills = List<String>.from(convert.jsonDecode(skillsRaw));
+      } catch (_) {}
     } else if (skillsRaw is List) {
       skills = skillsRaw.map((e) => e.toString()).toList();
     }
@@ -119,7 +122,8 @@ class ApiService {
         lastSeen = DateTime.fromMillisecondsSinceEpoch(lastSeenRaw);
       } else if (lastSeenRaw is String) {
         try {
-          lastSeen = DateTime.fromMillisecondsSinceEpoch(int.parse(lastSeenRaw));
+          lastSeen =
+              DateTime.fromMillisecondsSinceEpoch(int.parse(lastSeenRaw));
         } catch (_) {}
       }
     }
@@ -132,7 +136,8 @@ class ApiService {
         createdAt = DateTime.fromMillisecondsSinceEpoch(createdAtRaw);
       } else if (createdAtRaw is String) {
         try {
-          createdAt = DateTime.fromMillisecondsSinceEpoch(int.parse(createdAtRaw));
+          createdAt =
+              DateTime.fromMillisecondsSinceEpoch(int.parse(createdAtRaw));
         } catch (_) {
           createdAt = DateTime.now();
         }
@@ -170,7 +175,9 @@ class ApiService {
     if (value is int) return value;
     if (value is double) return value.toInt();
     if (value is String) {
-      try { return int.parse(value); } catch(_) {}
+      try {
+        return int.parse(value);
+      } catch (_) {}
     }
     return 0;
   }
@@ -194,7 +201,9 @@ class ApiService {
       debugPrint('URL: $_baseUrl/api/auth/register');
 
       final response = await _dio.post('/api/auth/register', data: {
-        'name': name, 'email': email, 'password': password,
+        'name': name,
+        'email': email,
+        'password': password,
         if (university != null) 'university': university,
         if (faculty != null) 'faculty': faculty,
         if (course != null) 'course': course,
@@ -208,7 +217,8 @@ class ApiService {
       debugPrint('Response data type: ${response.data.runtimeType}');
 
       if (response.data == null) {
-        throw Exception('Сервер вернул пустой ответ. Проверьте что backend работает.');
+        throw Exception(
+            'Сервер вернул пустой ответ. Проверьте что backend работает.');
       }
 
       final data = response.data as Map<String, dynamic>;
@@ -241,9 +251,9 @@ class ApiService {
       debugPrint('=== LOGIN ATTEMPT (ApiService) ===');
       debugPrint('Email: $email');
       debugPrint('URL: $_baseUrl/api/auth/login');
-      
+
       final response = await _dio.post('/api/auth/login', data: {
-        'email': email, 
+        'email': email,
         'password': password,
       });
 
@@ -252,16 +262,17 @@ class ApiService {
       debugPrint('Response data type: ${response.data.runtimeType}');
 
       if (response.data == null) {
-        throw Exception('Сервер вернул пустой ответ. Проверьте что backend работает.');
+        throw Exception(
+            'Сервер вернул пустой ответ. Проверьте что backend работает.');
       }
 
       final data = response.data as Map<String, dynamic>;
-      
+
       // Проверяем есть ли ошибка в ответе
       if (data.containsKey('error')) {
         throw Exception(data['error']);
       }
-      
+
       final user = _parseUser(data['user'] as Map<String, dynamic>);
       await _saveToken(data['token'] as String, user.id);
       debugPrint('Login successful for user: ${user.name}');
@@ -316,8 +327,8 @@ class ApiService {
   Future<List<User>> searchUsers(String query) async {
     if (query.isEmpty) return [];
     try {
-      final response = await _dio.get('/api/users/search',
-          queryParameters: {'q': query});
+      final response =
+          await _dio.get('/api/users/search', queryParameters: {'q': query});
       final data = response.data as Map<String, dynamic>;
       return (data['users'] as List)
           .map((u) => _parseUser(u as Map<String, dynamic>))
@@ -478,7 +489,8 @@ class ApiService {
       formData.fields.add(MapEntry('skills', convert.jsonEncode(skills)));
     }
     if (universityTags.isNotEmpty) {
-      formData.fields.add(MapEntry('university_tags', convert.jsonEncode(universityTags)));
+      formData.fields
+          .add(MapEntry('university_tags', convert.jsonEncode(universityTags)));
     }
 
     // Добавляем файлы изображений
@@ -527,7 +539,8 @@ class ApiService {
     }
   }
 
-  Future<Map<String, dynamic>> uploadProjectZip(String projectId, String filePath) async {
+  Future<Map<String, dynamic>> uploadProjectZip(
+      String projectId, String filePath) async {
     final formData = FormData.fromMap({
       'file': await MultipartFile.fromFile(filePath),
     });
@@ -558,7 +571,8 @@ class ApiService {
       debugPrint('Downloading ZIP file from: $url');
 
       // Сохраняем в публичную папку Downloads
-      final downloadsDir = Directory('/storage/emulated/0/Download/StudentConnect');
+      final downloadsDir =
+          Directory('/storage/emulated/0/Download/StudentConnect');
       if (!await downloadsDir.exists()) {
         await downloadsDir.create(recursive: true);
       }
@@ -578,7 +592,8 @@ class ApiService {
         ),
         onReceiveProgress: (received, total) {
           if (total != -1) {
-            debugPrint('Download progress: $received / $total (${((received / total) * 100).toStringAsFixed(1)}%)');
+            debugPrint(
+                'Download progress: $received / $total (${((received / total) * 100).toStringAsFixed(1)}%)');
             onProgress(received, total);
           }
         },
@@ -587,7 +602,7 @@ class ApiService {
       // Проверяем что это не JSON ошибка
       final contentType = response.headers.value('content-type') ?? '';
       debugPrint('Content-Type: $contentType');
-      
+
       if (contentType.contains('application/json')) {
         // Сервер вернул JSON (скорее всего ошибку)
         final bytes = <int>[];
@@ -606,14 +621,14 @@ class ApiService {
         sink.add(chunk);
       }
       await sink.close();
-      
+
       final fileSize = await file.length();
       debugPrint('File downloaded successfully: $fileSize bytes');
-      
+
       if (fileSize == 0) {
         throw Exception('Файл пустой (0 байт)');
       }
-      
+
       return filePath;
     } catch (e) {
       debugPrint('Download ZIP error: $e');
@@ -639,7 +654,8 @@ class ApiService {
     required String content,
     String? replyToCommentId,
   }) async {
-    final response = await _dio.post('/api/projects/$projectId/comments', data: {
+    final response =
+        await _dio.post('/api/projects/$projectId/comments', data: {
       'content': content,
       if (replyToCommentId != null) 'reply_to_id': replyToCommentId,
     });
@@ -686,32 +702,35 @@ class ApiService {
     String? projectId,
   }) async {
     final response = await _dio.post('/api/chats/$chatId/messages', data: {
-      'content': content, 'type': type,
+      'content': content,
+      'type': type,
       'attachments': attachments,
       if (projectId != null) 'project_id': projectId,
     });
-    
+
     debugPrint('sendMessage response status: ${response.statusCode}');
     debugPrint('sendMessage response data: ${response.data}');
-    
+
     final data = response.data;
     if (data == null) {
       throw Exception('Сервер вернул пустой ответ');
     }
-    
+
     if (data is! Map<String, dynamic>) {
-      throw Exception('Неверный формат ответа сервера: ожидался Map, получен ${data.runtimeType}');
+      throw Exception(
+          'Неверный формат ответа сервера: ожидался Map, получен ${data.runtimeType}');
     }
-    
+
     // Проверяем, что message существует и это Map
     final messageData = data['message'];
     if (messageData == null) {
       debugPrint('Warning: message field is null in response: $data');
       throw Exception('Сервер вернул null в поле message');
     }
-    
+
     if (messageData is! Map<String, dynamic>) {
-      throw Exception('Неверный формат ответа сервера: message не является Map, это ${messageData.runtimeType}');
+      throw Exception(
+          'Неверный формат ответа сервера: message не является Map, это ${messageData.runtimeType}');
     }
 
     return messageData;
@@ -773,20 +792,35 @@ class ApiService {
       final name = data['sender_name'] as String?;
       final id = data['sender_id'] as String?;
       if (id != null) {
-        cacheUser({'id': id, 'name': name, 'email': data['sender_email'],
-          'avatar_url': data['sender_avatar'], 'is_online': data['sender_is_online']});
+        cacheUser({
+          'id': id,
+          'name': name,
+          'email': data['sender_email'],
+          'avatar_url': data['sender_avatar'],
+          'is_online': data['sender_is_online']
+        });
         return User(
-          id: id, name: name ?? 'Пользователь',
+          id: id,
+          name: name ?? 'Пользователь',
           email: data['sender_email'] ?? '',
           avatarUrl: data['sender_avatar'],
           isOnline: (data['sender_is_online'] as int?) == 1,
-          createdAt: DateTime.now(), skills: [],
-          projectsCount: 0, followersCount: 0, followingCount: 0,
+          createdAt: DateTime.now(),
+          skills: [],
+          projectsCount: 0,
+          followersCount: 0,
+          followingCount: 0,
         );
       }
-      return User(id: 'unknown', name: 'Пользователь', email: '',
-        createdAt: DateTime.now(), skills: [],
-        projectsCount: 0, followersCount: 0, followingCount: 0);
+      return User(
+          id: 'unknown',
+          name: 'Пользователь',
+          email: '',
+          createdAt: DateTime.now(),
+          skills: [],
+          projectsCount: 0,
+          followersCount: 0,
+          followingCount: 0);
     }
     return _parseUser(sender);
   }
@@ -807,15 +841,20 @@ class ApiService {
       followingCount: _toInt(data['author_following_count']),
     );
     cacheUser({
-      'id': author.id, 'name': author.name, 'email': author.email,
-      'avatar_url': author.avatarUrl, 'university': author.university,
+      'id': author.id,
+      'name': author.name,
+      'email': author.email,
+      'avatar_url': author.avatarUrl,
+      'university': author.university,
       'is_online': author.isOnline ? 1 : 0,
       'skills': data['author_skills'],
     });
 
     List<String> images = [];
     try {
-      final rawImages = data['images'] is String ? convert.jsonDecode(data['images']) : (data['images'] ?? []);
+      final rawImages = data['images'] is String
+          ? convert.jsonDecode(data['images'])
+          : (data['images'] ?? []);
       images = List<String>.from(rawImages).map((img) {
         // Конвертируем относительные пути в полные URL
         if (img.startsWith('/uploads/')) {
@@ -823,9 +862,13 @@ class ApiService {
         }
         return img;
       }).toList();
-    } catch(_) {}
+    } catch (_) {}
     List<String> tags = [];
-    try { tags = List<String>.from(data['tags'] is String ? convert.jsonDecode(data['tags']) : (data['tags'] ?? [])); } catch(_) {}
+    try {
+      tags = List<String>.from(data['tags'] is String
+          ? convert.jsonDecode(data['tags'])
+          : (data['tags'] ?? []));
+    } catch (_) {}
 
     // Парсинг created_at
     DateTime createdAt = DateTime.now();
@@ -835,7 +878,8 @@ class ApiService {
         createdAt = DateTime.fromMillisecondsSinceEpoch(createdAtRaw);
       } else if (createdAtRaw is String) {
         try {
-          createdAt = DateTime.fromMillisecondsSinceEpoch(int.parse(createdAtRaw));
+          createdAt =
+              DateTime.fromMillisecondsSinceEpoch(int.parse(createdAtRaw));
         } catch (_) {}
       }
     }
@@ -861,8 +905,11 @@ class ApiService {
       email: data['author_email'] ?? '',
       avatarUrl: data['avatar_url'] ?? data['author_avatar'],
       isOnline: _toBool(data['is_online'] ?? data['author_is_online']),
-      createdAt: DateTime.now(), skills: [],
-      projectsCount: 0, followersCount: 0, followingCount: 0,
+      createdAt: DateTime.now(),
+      skills: [],
+      projectsCount: 0,
+      followersCount: 0,
+      followingCount: 0,
     );
 
     // Парсинг created_at
@@ -873,7 +920,8 @@ class ApiService {
         createdAt = DateTime.fromMillisecondsSinceEpoch(createdAtRaw);
       } else if (createdAtRaw is String) {
         try {
-          createdAt = DateTime.fromMillisecondsSinceEpoch(int.parse(createdAtRaw));
+          createdAt =
+              DateTime.fromMillisecondsSinceEpoch(int.parse(createdAtRaw));
         } catch (_) {}
       }
     }
@@ -905,17 +953,24 @@ class ApiService {
 
     List<String> images = [];
     try {
-      final rawImages = data['images'] is String ? convert.jsonDecode(data['images']) : (data['images'] ?? []);
+      final rawImages = data['images'] is String
+          ? convert.jsonDecode(data['images'])
+          : (data['images'] ?? []);
       images = List<String>.from(rawImages).map((img) {
-        // Конвертируем относительные пути в полные URL
+        // Конвертируем относительные пути в полные URL (для старых данных)
         if (img.startsWith('/uploads/')) {
           return '$_baseUrl$img';
         }
+        // Если уже полный URL - возвращаем как есть
         return img;
       }).toList();
-    } catch(_) {}
+    } catch (_) {}
     List<String> skills = [];
-    try { skills = List<String>.from(data['skills'] is String ? convert.jsonDecode(data['skills']) : (data['skills'] ?? [])); } catch(_) {}
+    try {
+      skills = List<String>.from(data['skills'] is String
+          ? convert.jsonDecode(data['skills'])
+          : (data['skills'] ?? []));
+    } catch (_) {}
 
     // Парсинг created_at
     DateTime createdAt = DateTime.now();
@@ -925,7 +980,8 @@ class ApiService {
         createdAt = DateTime.fromMillisecondsSinceEpoch(createdAtRaw);
       } else if (createdAtRaw is String) {
         try {
-          createdAt = DateTime.fromMillisecondsSinceEpoch(int.parse(createdAtRaw));
+          createdAt =
+              DateTime.fromMillisecondsSinceEpoch(int.parse(createdAtRaw));
         } catch (_) {}
       }
     }
@@ -938,7 +994,8 @@ class ApiService {
         updatedAt = DateTime.fromMillisecondsSinceEpoch(updatedAtRaw);
       } else if (updatedAtRaw is String) {
         try {
-          updatedAt = DateTime.fromMillisecondsSinceEpoch(int.parse(updatedAtRaw));
+          updatedAt =
+              DateTime.fromMillisecondsSinceEpoch(int.parse(updatedAtRaw));
         } catch (_) {}
       }
     }
@@ -965,7 +1022,11 @@ class ApiService {
 
   List<String> _parseStringList(dynamic data) {
     if (data is String) {
-      try { return List<String>.from(convert.jsonDecode(data)); } catch(_) { return []; }
+      try {
+        return List<String>.from(convert.jsonDecode(data));
+      } catch (_) {
+        return [];
+      }
     }
     if (data is List) return data.map((e) => e.toString()).toList();
     return [];
