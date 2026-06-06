@@ -15,6 +15,10 @@ import '../post/post_detail_screen.dart';
 import '../settings/settings_screen.dart';
 import 'edit_profile_screen.dart';
 import 'followers_screen.dart';
+import 'my_projects_screen.dart';
+import 'skills_screen.dart';
+import 'achievements_screen.dart';
+import '../teams/my_teams_screen.dart';
 
 /// Экран профиля — стиль Instagram 2025
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -85,14 +89,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
 
     return projectsAsync.when(
       data: (allProjects) {
-        final userProjects = allProjects.where((p) => p.author.id == user.id).toList();
+        final userProjects =
+            allProjects.where((p) => p.author.id == user.id).toList();
         return postsAsync.when(
           data: (allPosts) {
-            final userPosts = allPosts.where((p) => p.author.id == user.id).toList();
+            final userPosts =
+                allPosts.where((p) => p.author.id == user.id).toList();
             return _buildProfileContent(context, user, userPosts, userProjects);
           },
           loading: () => _buildProfileContent(context, user, [], userProjects),
-          error: (_, __) => _buildProfileContent(context, user, [], userProjects),
+          error: (_, __) =>
+              _buildProfileContent(context, user, [], userProjects),
         );
       },
       loading: () => Scaffold(
@@ -103,9 +110,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     );
   }
 
-  Widget _buildProfileContent(
-      BuildContext context, User user, List<Post> userPosts, List<Project> userProjects) {
-
+  Widget _buildProfileContent(BuildContext context, User user,
+      List<Post> userPosts, List<Project> userProjects) {
     return Scaffold(
       backgroundColor: AppColors.backgroundDark,
       body: RefreshIndicator(
@@ -162,13 +168,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                             children: [
-                              _buildStatItem(
-                                  '${user.projectsCount}', 'Проекты', onTap: null),
+                              _buildStatItem('${user.projectsCount}', 'Проекты',
+                                  onTap: null),
                               _buildStatItem('${user.followersCount}', 'Подп.',
-                                onTap: () => _openFollowersScreen(user, showFollowers: true)),
+                                  onTap: () => _openFollowersScreen(user,
+                                      showFollowers: true)),
                               _buildStatItem(
                                   '${user.followingCount}', 'Подписки',
-                                  onTap: () => _openFollowersScreen(user, showFollowers: false)),
+                                  onTap: () => _openFollowersScreen(user,
+                                      showFollowers: false)),
                             ],
                           ),
                         ),
@@ -302,10 +310,30 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   children: [
-                    _buildHighlight('Мои проекты', Icons.folder_outlined),
-                    _buildHighlight('Навыки', Icons.workspace_premium_outlined),
-                    _buildHighlight('Команды', Icons.groups_outlined),
-                    _buildHighlight('Достижения', Icons.emoji_events_outlined),
+                    _buildHighlight(
+                      'Мои проекты',
+                      Icons.folder_outlined,
+                      () => Navigator.push(
+                          context, slideTransition(const MyProjectsScreen())),
+                    ),
+                    _buildHighlight(
+                      'Навыки',
+                      Icons.workspace_premium_outlined,
+                      () => Navigator.push(
+                          context, slideTransition(const SkillsScreen())),
+                    ),
+                    _buildHighlight(
+                      'Команды',
+                      Icons.groups_outlined,
+                      () => Navigator.push(
+                          context, slideTransition(const MyTeamsScreen())),
+                    ),
+                    _buildHighlight(
+                      'Достижения',
+                      Icons.emoji_events_outlined,
+                      () => Navigator.push(
+                          context, slideTransition(const AchievementsScreen())),
+                    ),
                   ],
                 ),
               ),
@@ -709,42 +737,45 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     );
   }
 
-  Widget _buildHighlight(String label, IconData icon) {
+  Widget _buildHighlight(String label, IconData icon, VoidCallback onTap) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: Column(
-        children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: AppColors.divider.withValues(alpha: 0.5),
-                width: 1,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Column(
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: AppColors.divider.withValues(alpha: 0.5),
+                  width: 1,
+                ),
+              ),
+              child: Icon(
+                icon,
+                size: 24,
+                color: AppColors.textDarkSecondary,
               ),
             ),
-            child: Icon(
-              icon,
-              size: 24,
-              color: AppColors.textDarkSecondary,
-            ),
-          ),
-          const SizedBox(height: 4),
-          SizedBox(
-            width: 64,
-            child: Text(
-              label,
-              style: const TextStyle(
-                fontSize: 11,
-                color: AppColors.textDark,
+            const SizedBox(height: 4),
+            SizedBox(
+              width: 64,
+              child: Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: AppColors.textDark,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -839,7 +870,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Удалить пост',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-        content: const Text('Вы уверены, что хотите удалить этот пост? Это действие нельзя отменить.'),
+        content: const Text(
+            'Вы уверены, что хотите удалить этот пост? Это действие нельзя отменить.'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
@@ -855,7 +887,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     );
     if (confirm == true) {
       final success = await ApiService.instance.deletePost(post.id);
-      
+
       if (mounted) {
         if (success) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -865,7 +897,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
               behavior: SnackBarBehavior.floating,
             ),
           );
-          
+
           // Обновляем список постов
           ref.invalidate(postsStreamProvider);
           ref.invalidate(currentUserProvider);
@@ -890,7 +922,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Удалить проект',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-        content: const Text('Вы уверены, что хотите удалить этот проект? Все файлы будут удалены. Это действие нельзя отменить.'),
+        content: const Text(
+            'Вы уверены, что хотите удалить этот проект? Все файлы будут удалены. Это действие нельзя отменить.'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
@@ -906,7 +939,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     );
     if (confirm == true) {
       final success = await ApiService.instance.deleteProject(project.id);
-      
+
       if (mounted) {
         if (success) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -916,7 +949,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
               behavior: SnackBarBehavior.floating,
             ),
           );
-          
+
           // Обновляем список проектов
           ref.invalidate(projectsStreamProvider);
           ref.invalidate(currentUserProvider);
