@@ -178,6 +178,31 @@ async function initDatabase() {
       )
     `);
 
+    // Teams table - команды для проектов
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS teams (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        project_id TEXT,
+        creator_id TEXT NOT NULL,
+        chat_id TEXT,
+        members TEXT DEFAULT '[]',
+        created_at BIGINT DEFAULT EXTRACT(EPOCH FROM NOW()) * 1000
+      )
+    `);
+
+    // Team invitations table - приглашения в команды
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS team_invitations (
+        id TEXT PRIMARY KEY,
+        team_id TEXT NOT NULL,
+        from_user_id TEXT NOT NULL,
+        to_user_id TEXT NOT NULL,
+        status TEXT DEFAULT 'pending',
+        created_at BIGINT DEFAULT EXTRACT(EPOCH FROM NOW()) * 1000
+      )
+    `);
+
     console.log('✅ Database schema initialized successfully');
   } catch (error) {
     console.error('❌ Error initializing database:', error);

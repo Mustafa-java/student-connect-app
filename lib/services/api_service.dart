@@ -1061,4 +1061,50 @@ class ApiService {
     if (data is List) return data.map((e) => e.toString()).toList();
     return [];
   }
+
+  /// ==================== TEAMS ====================
+
+  Future<Map<String, dynamic>> createTeam({
+    required String name,
+    String? projectId,
+    List<String> memberIds = const [],
+  }) async {
+    final response = await _dio.post('/api/teams', data: {
+      'name': name,
+      'project_id': projectId,
+      'member_ids': memberIds,
+    });
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<List<Map<String, dynamic>>> getMyTeams() async {
+    try {
+      final response = await _dio.get('/api/teams/my');
+      final data = response.data as Map<String, dynamic>;
+      return List<Map<String, dynamic>>.from(data['teams'] ?? []);
+    } catch (e) {
+      debugPrint('getMyTeams error: $e');
+      return [];
+    }
+  }
+
+  Future<Map<String, dynamic>> inviteToTeam({
+    required String teamId,
+    required String userId,
+  }) async {
+    final response = await _dio.post('/api/teams/$teamId/invite', data: {
+      'user_id': userId,
+    });
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<bool> leaveTeam(String teamId) async {
+    try {
+      final response = await _dio.post('/api/teams/$teamId/leave');
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('leaveTeam error: $e');
+      return false;
+    }
+  }
 }

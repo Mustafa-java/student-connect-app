@@ -1142,6 +1142,183 @@ app.get('/api/following/:userId', authMiddleware, async (req, res) => {
   }
 });
 
+// ==================== TEAMS ====================
+
+// Создать команду
+app.post('/api/teams', authMiddleware, async (req, res) => {
+  try {
+    const { name, project_id, member_ids } = req.body;
+    
+    if (!name) {
+      return res.status(400).json({ error: 'Название команды обязательно' });
+    }
+    
+    const teamId = uuidv4();
+    const chatId = uuidv4();
+    
+    // Добавляем создателя в список участников
+    let members = [req.userId];
+    if (member_ids && Array.isArray(member_ids)) {
+      members = [...new Set([...members, ...member_ids])]; // Убираем дубликаты
+    }
+    
+    // Создаем групповой чат для команды
+    const participantIds = members.join(',');
+    await pool.query(
+      'INSERT INTO chats (id, participant_ids, last_message, last_sender_id, last_message_at) VALUES ($1, $2, $3, $4, $5)',
+      [chatId, participantIds, 'Команда создана', req.userId, Date.now()]
+    );
+    
+    // Создаем команду
+    await pool.query(
+      'INSERT INTO teams (id, name, project_id, creator_id, chat_id, members) VALUES ($1, $2, $3, $4, $5, $6)',
+      [teamId, name, project_id || null, req.userId, chatId, JSON.stringify(members)]
+    );
+    
+    // Инициализируем unread для всех участников
+    for (const memberId of members) {
+      await pool.query(
+        'INSERT INTO chat_unread (chat_id, user_id, unread_count) VALUES ($1, $2, $3) ON CONFLICT (chat_id, user_id) DO NOTHING',
+        [chatId, memberId, 0]
+      );
+    }
+    
+    const result = await pool.query('SELECT * FROM teams WHERE id = $1', [teamId]);
+    
+    res.status(201).json({ team: result.rows[0] });
+  } catch(e) {
+    console.error('Create team error:', e);
+    res.status(500).json({ error: 'Ошибка создания команды' });
+  }
+});
+
+// Получить команды пользователя
+app.get('/api/teams/my', authMiddleware, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM teams WHERE members::jsonb @> $1 ORDER BY created_at DESC`,
+      [JSON.stringify([req.userId])]
+    );
+    
+    res.json({ teams: result.rows });
+  } catch(e) {
+    console.error('Get my teams error:', e);
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+// Пригласить пользователя в команду
+app.post('/api/teams/:teamId/invite', authMiddleware, async (req, res) => {
+  try {
+    const { teamId } = req.params;
+    const { user_id } = req.body;
+    
+    if (!user_id) {
+      return res.status(400).json({ error: 'user_id обязателен' });
+    }
+    
+    // Проверяем что команда существует
+    const teamResult = await pool.query('SELECT * FROM teams WHERE id = $1', [teamId]);
+    if (teamResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Команда не найдена' });
+    }
+    
+    const team = teamResult.rows[0];
+    const members = JSON.parse(team.members || '[]');
+    
+    // Проверяем что текущий пользователь в команде
+    if (!members.includes(req.userId)) {
+      return res.status(403).json({ error: 'Вы не состоите в этой команде' });
+    }
+    
+    // Проверяем что пользователь еще не в команде
+    if (members.includes(user_id)) {
+      return res.status(400).json({ error: 'Пользователь уже в команде' });
+    }
+    
+    // Добавляем пользователя в команду
+    members.push(user_id);
+    await pool.query(
+      'UPDATE teams SET members = $1 WHERE id = $2',
+      [JSON.stringify(members), teamId]
+    );
+    
+    // Добавляем пользователя в групповой чат
+    const chatResult = await pool.query('SELECT * FROM chats WHERE id = $1', [team.chat_id]);
+    if (chatResult.rows.length > 0) {
+      const chat = chatResult.rows[0];
+      const participantIds = chat.participant_ids ? chat.participant_ids.split(',') : [];
+      if (!participantIds.includes(user_id)) {
+        participantIds.push(user_id);
+        await pool.query(
+          'UPDATE chats SET participant_ids = $1 WHERE id = $2',
+          [participantIds.join(','), team.chat_id]
+        );
+        
+        // Добавляем unread для нового участника
+        await pool.query(
+          'INSERT INTO chat_unread (chat_id, user_id, unread_count) VALUES ($1, $2, $3) ON CONFLICT (chat_id, user_id) DO NOTHING',
+          [team.chat_id, user_id, 0]
+        );
+      }
+    }
+    
+    const updatedTeam = await pool.query('SELECT * FROM teams WHERE id = $1', [teamId]);
+    
+    res.json({ team: updatedTeam.rows[0] });
+  } catch(e) {
+    console.error('Invite to team error:', e);
+    res.status(500).json({ error: 'Ошибка приглашения' });
+  }
+});
+
+// Покинуть команду
+app.post('/api/teams/:teamId/leave', authMiddleware, async (req, res) => {
+  try {
+    const { teamId } = req.params;
+    
+    const teamResult = await pool.query('SELECT * FROM teams WHERE id = $1', [teamId]);
+    if (teamResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Команда не найдена' });
+    }
+    
+    const team = teamResult.rows[0];
+    let members = JSON.parse(team.members || '[]');
+    
+    // Удаляем пользователя из команды
+    members = members.filter(id => id !== req.userId);
+    
+    if (members.length === 0) {
+      // Если последний участник, удаляем команду
+      await pool.query('DELETE FROM teams WHERE id = $1', [teamId]);
+      return res.json({ deleted: true });
+    }
+    
+    await pool.query(
+      'UPDATE teams SET members = $1 WHERE id = $2',
+      [JSON.stringify(members), teamId]
+    );
+    
+    // Удаляем из чата
+    if (team.chat_id) {
+      const chatResult = await pool.query('SELECT * FROM chats WHERE id = $1', [team.chat_id]);
+      if (chatResult.rows.length > 0) {
+        const chat = chatResult.rows[0];
+        const participantIds = chat.participant_ids.split(',').filter(id => id !== req.userId);
+        await pool.query(
+          'UPDATE chats SET participant_ids = $1 WHERE id = $2',
+          [participantIds.join(','), team.chat_id]
+        );
+      }
+    }
+    
+    res.json({ ok: true });
+  } catch(e) {
+    console.error('Leave team error:', e);
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
 // ==================== START ====================
 
 app.use((err, req, res, next) => {
