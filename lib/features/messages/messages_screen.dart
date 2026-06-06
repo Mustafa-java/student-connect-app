@@ -123,14 +123,19 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
 
                 if (_searchQuery.isNotEmpty) {
                   filteredChats = filteredChats.where((chat) {
-                    return chat.currentUser.name.toLowerCase().contains(_searchQuery);
+                    return chat.currentUser.name
+                        .toLowerCase()
+                        .contains(_searchQuery);
                   }).toList();
                 }
 
                 if (_selectedFilter == 'Непрочитанные') {
-                  filteredChats = filteredChats.where((chat) => chat.unreadCount > 0).toList();
+                  filteredChats = filteredChats
+                      .where((chat) => chat.unreadCount > 0)
+                      .toList();
                 } else if (_selectedFilter == 'Онлайн') {
-                  filteredChats = filteredChats.where((chat) => chat.isOnline).toList();
+                  filteredChats =
+                      filteredChats.where((chat) => chat.isOnline).toList();
                 }
 
                 if (filteredChats.isEmpty) {
@@ -190,6 +195,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
 
   Widget _buildChatTile(Chat chat, BuildContext context) {
     final user = chat.currentUser;
+    final isGroup = chat.isGroup;
 
     return Material(
       color: Colors.transparent,
@@ -204,11 +210,18 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Row(
             children: [
-              AvatarWithOnlineIndicator(
-                imageUrl: user.avatarUrl,
-                radius: 26,
-                isOnline: chat.isOnline,
-              ),
+              isGroup
+                  ? CircleAvatar(
+                      radius: 26,
+                      backgroundColor: AppColors.primary,
+                      child:
+                          const Icon(Icons.groups_rounded, color: Colors.white),
+                    )
+                  : AvatarWithOnlineIndicator(
+                      imageUrl: user.avatarUrl,
+                      radius: 26,
+                      isOnline: chat.isOnline,
+                    ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -218,7 +231,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                       children: [
                         Expanded(
                           child: Text(
-                            user.name,
+                            chat.displayTitle,
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: chat.unreadCount > 0
@@ -243,7 +256,9 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                       children: [
                         Expanded(
                           child: Text(
-                            chat.lastMessagePreview,
+                            isGroup
+                                ? '${chat.participantsCount} участников · ${chat.lastMessagePreview}'
+                                : chat.lastMessagePreview,
                             style: TextStyle(
                               fontSize: 13,
                               color: chat.unreadCount > 0

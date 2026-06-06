@@ -35,6 +35,16 @@ function convertImageUrls(images, baseUrl) {
   }
 }
 
+function parseParticipantIds(participantIds) {
+  if (!participantIds) return [];
+  try {
+    const parsed = JSON.parse(participantIds);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return participantIds.split(',').filter(Boolean);
+  }
+}
+
 // Создаём папку uploads если нет
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
 if (!fs.existsSync(UPLOADS_DIR)) {
@@ -874,17 +884,32 @@ app.post('/api/projects/:id/comments', authMiddleware, async (req, res) => {
 app.get('/api/chats', authMiddleware, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT * FROM chats WHERE participant_ids LIKE $1 ORDER BY last_message_at DESC`,
-      [`%"${req.userId}"%`]
+      `SELECT * FROM chats WHERE participant_ids LIKE $1 OR participant_ids LIKE $2 ORDER BY last_message_at DESC`,
+      [`%"${req.userId}"%`, `%${req.userId}%`]
     );
 
     const chats = [];
     for (const chat of result.rows) {
-      const participants = JSON.parse(chat.participant_ids);
+      const participants = parseParticipantIds(chat.participant_ids);
+      if (!participants.includes(req.userId)) continue;
+
       const otherId = participants.find(x => x !== req.userId);
+      const isGroup = participants.length > 2;
+
+      let team = null;
+      if (isGroup) {
+        const teamResult = await pool.query('SELECT id, name FROM teams WHERE chat_id = $1', [chat.id]);
+        team = teamResult.rows[0] || null;
+      }
 
       const otherUserResult = await pool.query('SELECT * FROM users WHERE id = $1', [otherId]);
-      const otherUser = sanitizeUser(otherUserResult.rows[0]);
+      const otherUser = sanitizeUser(otherUserResult.rows[0]) || {
+        id: chat.id,
+        name: team?.name || 'Командный чат',
+        email: '',
+        avatar_url: null,
+        is_online: false
+      };
 
       const unreadResult = await pool.query(
         'SELECT unread_count FROM chat_unread WHERE chat_id = $1 AND user_id = $2',
@@ -912,9 +937,12 @@ app.get('/api/chats', authMiddleware, async (req, res) => {
       chats.push({
         id: chat.id,
         other_user: otherUser,
+        title: isGroup ? (team?.name || 'Командный чат') : otherUser.name,
+        is_group: isGroup,
+        participant_ids: JSON.stringify(participants),
         last_message: lastMessage,
         unread_count: unread,
-        is_online: otherUser?.is_online || false,
+        is_online: isGroup ? false : (otherUser?.is_online || false),
         last_message_at: chat.last_message_at,
         created_at: chat.created_at
       });
@@ -967,7 +995,7 @@ app.get('/api/chats/:id/messages', authMiddleware, async (req, res) => {
     }
 
     const chat = chatResult.rows[0];
-    const participants = JSON.parse(chat.participant_ids);
+    const participants = parseParticipantIds(chat.participant_ids);
     if (!participants.includes(req.userId)) {
       return res.status(403).json({ error: 'Нет доступа' });
     }
@@ -1000,14 +1028,12 @@ app.post('/api/chats/:id/messages', authMiddleware, async (req, res) => {
     }
 
     const chat = chatResult.rows[0];
-    const participants = JSON.parse(chat.participant_ids);
+    const participants = parseParticipantIds(chat.participant_ids);
     if (!participants.includes(req.userId)) {
       return res.status(403).json({ error: 'Нет доступа' });
     }
 
     const msgId = uuidv4();
-    const receiverId = participants.find(x => x !== req.userId);
-
     await pool.query(
       'INSERT INTO messages (id, chat_id, sender_id, content, type, attachments, project_id) VALUES ($1, $2, $3, $4, $5, $6, $7)',
       [msgId, req.params.id, req.userId, content, type || 'text', JSON.stringify(attachments || []), project_id || null]
@@ -1018,10 +1044,12 @@ app.post('/api/chats/:id/messages', authMiddleware, async (req, res) => {
       [content, type || 'text', req.userId, Date.now(), req.params.id]
     );
 
-    await pool.query(
-      'UPDATE chat_unread SET unread_count = unread_count + 1 WHERE chat_id = $1 AND user_id = $2',
-      [req.params.id, receiverId]
-    );
+    for (const participantId of participants.filter(x => x !== req.userId)) {
+      await pool.query(
+        'INSERT INTO chat_unread (chat_id, user_id, unread_count) VALUES ($1, $2, 1) ON CONFLICT (chat_id, user_id) DO UPDATE SET unread_count = chat_unread.unread_count + 1',
+        [req.params.id, participantId]
+      );
+    }
 
     const senderResult = await pool.query(
       'SELECT id, name, email, avatar_url, is_online FROM users WHERE id = $1',
@@ -1163,7 +1191,7 @@ app.post('/api/teams', authMiddleware, async (req, res) => {
     }
     
     // Создаем групповой чат для команды
-    const participantIds = members.join(',');
+    const participantIds = JSON.stringify(members);
     await pool.query(
       'INSERT INTO chats (id, participant_ids, last_message, last_sender_id, last_message_at) VALUES ($1, $2, $3, $4, $5)',
       [chatId, participantIds, 'Команда создана', req.userId, Date.now()]
@@ -1247,12 +1275,12 @@ app.post('/api/teams/:teamId/invite', authMiddleware, async (req, res) => {
     const chatResult = await pool.query('SELECT * FROM chats WHERE id = $1', [team.chat_id]);
     if (chatResult.rows.length > 0) {
       const chat = chatResult.rows[0];
-      const participantIds = chat.participant_ids ? chat.participant_ids.split(',') : [];
+      const participantIds = parseParticipantIds(chat.participant_ids);
       if (!participantIds.includes(user_id)) {
         participantIds.push(user_id);
         await pool.query(
           'UPDATE chats SET participant_ids = $1 WHERE id = $2',
-          [participantIds.join(','), team.chat_id]
+          [JSON.stringify(participantIds), team.chat_id]
         );
         
         // Добавляем unread для нового участника
@@ -1304,10 +1332,10 @@ app.post('/api/teams/:teamId/leave', authMiddleware, async (req, res) => {
       const chatResult = await pool.query('SELECT * FROM chats WHERE id = $1', [team.chat_id]);
       if (chatResult.rows.length > 0) {
         const chat = chatResult.rows[0];
-        const participantIds = chat.participant_ids.split(',').filter(id => id !== req.userId);
+        const participantIds = parseParticipantIds(chat.participant_ids).filter(id => id !== req.userId);
         await pool.query(
           'UPDATE chats SET participant_ids = $1 WHERE id = $2',
-          [participantIds.join(','), team.chat_id]
+          [JSON.stringify(participantIds), team.chat_id]
         );
       }
     }

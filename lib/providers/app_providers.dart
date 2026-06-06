@@ -403,6 +403,8 @@ Chat _parseChat(Map<String, dynamic> data) {
     lastMessageAt: _parseTimestampNullable(data['last_message_at']),
     createdAt: _parseTimestamp(data['created_at']),
     participantIds: data['participant_ids'] ?? '',
+    isGroup: _toBool(data['is_group']),
+    title: data['title'],
   );
 }
 

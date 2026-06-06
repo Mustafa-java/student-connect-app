@@ -66,13 +66,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         chatId: widget.chat.id,
         content: content,
       );
-      
+
       // Логируем успешную отправку
       debugPrint('Message sent successfully: ${messageData['id']}');
     } catch (e, stackTrace) {
       debugPrint('sendMessage error: $e');
       debugPrint('Stack trace: $stackTrace');
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -97,6 +97,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final user = widget.chat.currentUser;
     final messagesAsync = ref.watch(messagesStreamProvider(widget.chat.id));
     final currentUser = ref.watch(currentUserProvider);
+    final isGroup = widget.chat.isGroup;
 
     return Scaffold(
       backgroundColor: AppColors.backgroundDark,
@@ -110,18 +111,25 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         ),
         title: Row(
           children: [
-            AvatarWithOnlineIndicator(
-              imageUrl: user.avatarUrl,
-              radius: 16,
-              isOnline: widget.chat.isOnline,
-            ),
+            isGroup
+                ? CircleAvatar(
+                    radius: 16,
+                    backgroundColor: AppColors.primary,
+                    child: const Icon(Icons.groups_rounded,
+                        size: 18, color: Colors.white),
+                  )
+                : AvatarWithOnlineIndicator(
+                    imageUrl: user.avatarUrl,
+                    radius: 16,
+                    isOnline: widget.chat.isOnline,
+                  ),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    user.name,
+                    widget.chat.displayTitle,
                     style: const TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
@@ -130,10 +138,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(
-                    widget.chat.isOnline ? 'Онлайн' : 'Был(а) недавно',
+                    isGroup
+                        ? '${widget.chat.participantsCount} участников'
+                        : (widget.chat.isOnline ? 'Онлайн' : 'Был(а) недавно'),
                     style: TextStyle(
                       fontSize: 11,
-                      color: widget.chat.isOnline
+                      color: widget.chat.isOnline && !isGroup
                           ? AppColors.success
                           : AppColors.textDarkSecondary,
                     ),
@@ -144,14 +154,21 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.phone_outlined),
-            onPressed: () {},
-          ),
-          IconButton(
-            icon: const Icon(Icons.videocam_outlined),
-            onPressed: () {},
-          ),
+          if (isGroup)
+            IconButton(
+              icon: const Icon(Icons.info_outline),
+              onPressed: _showGroupInfo,
+            )
+          else ...[
+            IconButton(
+              icon: const Icon(Icons.phone_outlined),
+              onPressed: () {},
+            ),
+            IconButton(
+              icon: const Icon(Icons.videocam_outlined),
+              onPressed: () {},
+            ),
+          ],
         ],
       ),
       body: Column(
@@ -232,9 +249,51 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
   }
 
+  void _showGroupInfo() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surfaceDark,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircleAvatar(
+                radius: 32,
+                backgroundColor: AppColors.primary,
+                child: const Icon(Icons.groups_rounded,
+                    color: Colors.white, size: 32),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                widget.chat.displayTitle,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textDark,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '${widget.chat.participantsCount} участников',
+                style: TextStyle(color: AppColors.textDarkSecondary),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildMessageBubble(Message message, bool isMe) {
     // Для постов и проектов показываем превью
-    if (message.type == MessageType.post || message.type == MessageType.project) {
+    if (message.type == MessageType.post ||
+        message.type == MessageType.project) {
       return _buildSharedContentBubble(message, isMe);
     }
 
@@ -368,7 +427,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  message.content.split('\n').first.replaceAll('📝 ', '').replaceAll('📌 ', ''),
+                                  message.content
+                                      .split('\n')
+                                      .first
+                                      .replaceAll('📝 ', '')
+                                      .replaceAll('📌 ', ''),
                                   style: const TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w600,
@@ -404,7 +467,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           if (isMe) ...[
                             const SizedBox(width: 4),
                             Icon(
-                              message.isRead ? Icons.done_all : Icons.done_outlined,
+                              message.isRead
+                                  ? Icons.done_all
+                                  : Icons.done_outlined,
                               size: 12,
                               color: message.isRead
                                   ? AppColors.accent
@@ -432,21 +497,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       return;
     }
 
-    debugPrint('Opening shared content: type=${message.type}, id=${message.projectId}');
+    debugPrint(
+        'Opening shared content: type=${message.type}, id=${message.projectId}');
 
     try {
       if (message.type == MessageType.post) {
         // Загрузка поста по ID
         debugPrint('Loading posts...');
         final posts = await ApiService.instance.getPosts();
-        debugPrint('Loaded ${posts.length} posts, searching for ${message.projectId}');
+        debugPrint(
+            'Loaded ${posts.length} posts, searching for ${message.projectId}');
 
         final post = posts.firstWhere(
           (p) {
             debugPrint('Checking post: id=${p.id}');
             return p.id == message.projectId;
           },
-          orElse: () => throw Exception('Пост не найден (ID: ${message.projectId})'),
+          orElse: () =>
+              throw Exception('Пост не найден (ID: ${message.projectId})'),
         );
 
         debugPrint('Post found: ${post.id}');
@@ -462,7 +530,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         // Загрузка проекта по ID
         debugPrint('Loading projects...');
         final projects = await ApiService.instance.getProjects();
-        debugPrint('Loaded ${projects.length} projects, searching for ${message.projectId}');
+        debugPrint(
+            'Loaded ${projects.length} projects, searching for ${message.projectId}');
 
         final project = projects.firstWhere(
           (p) => p.id == message.projectId,

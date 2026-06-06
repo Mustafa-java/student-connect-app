@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/custom_avatar.dart';
@@ -12,8 +13,6 @@ import '../messages/chat_screen.dart';
 import '../post/post_detail_screen.dart';
 import '../project/project_detail_screen.dart';
 import '../teams/team_selection_dialog.dart';
-import '../post/post_detail_screen.dart';
-import '../messages/chat_screen.dart';
 import 'followers_screen.dart';
 
 /// Экран просмотра чужого профиля

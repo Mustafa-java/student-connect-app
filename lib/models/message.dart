@@ -139,7 +139,9 @@ class Chat extends Equatable {
   final bool isOnline;
   final DateTime? lastMessageAt;
   final DateTime createdAt;
-  final String participantIds; // Список ID участников через запятую
+  final String participantIds; // JSON/string список ID участников
+  final bool isGroup;
+  final String? title;
 
   const Chat({
     required this.id,
@@ -150,6 +152,8 @@ class Chat extends Equatable {
     this.lastMessageAt,
     required this.createdAt,
     this.participantIds = '',
+    this.isGroup = false,
+    this.title,
   });
 
   @override
@@ -162,6 +166,8 @@ class Chat extends Equatable {
         lastMessageAt,
         createdAt,
         participantIds,
+        isGroup,
+        title,
       ];
 
   Chat copyWith({
@@ -173,6 +179,8 @@ class Chat extends Equatable {
     DateTime? lastMessageAt,
     DateTime? createdAt,
     String? participantIds,
+    bool? isGroup,
+    String? title,
   }) {
     return Chat(
       id: id ?? this.id,
@@ -183,6 +191,8 @@ class Chat extends Equatable {
       lastMessageAt: lastMessageAt ?? this.lastMessageAt,
       createdAt: createdAt ?? this.createdAt,
       participantIds: participantIds ?? this.participantIds,
+      isGroup: isGroup ?? this.isGroup,
+      title: title ?? this.title,
     );
   }
 
@@ -195,6 +205,9 @@ class Chat extends Equatable {
       'isOnline': isOnline,
       'lastMessageAt': lastMessageAt?.toIso8601String(),
       'createdAt': createdAt.toIso8601String(),
+      'participantIds': participantIds,
+      'isGroup': isGroup,
+      'title': title,
     };
   }
 
@@ -213,7 +226,26 @@ class Chat extends Equatable {
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'])
           : DateTime.now(),
+      participantIds: json['participantIds'] ?? '',
+      isGroup: json['isGroup'] ?? false,
+      title: json['title'],
     );
+  }
+
+  String get displayTitle =>
+      isGroup ? (title ?? 'Командный чат') : currentUser.name;
+
+  int get participantsCount {
+    if (participantIds.isEmpty) return isGroup ? 0 : 2;
+    try {
+      final cleaned = participantIds
+          .replaceAll('[', '')
+          .replaceAll(']', '')
+          .replaceAll('"', '');
+      return cleaned.split(',').where((e) => e.trim().isNotEmpty).length;
+    } catch (_) {
+      return isGroup ? 0 : 2;
+    }
   }
 
   /// Текст последнего сообщения для превью
