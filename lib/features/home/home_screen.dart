@@ -108,9 +108,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               data: (posts) {
                 debugPrint('HomeScreen: rendering ${posts.length} posts');
                 for (var post in posts) {
-                  debugPrint('  - Post by: ${post.author.name}, content: ${post.content?.substring(0, post.content!.length > 30 ? 30 : post.content!.length)}');
+                  debugPrint(
+                      '  - Post by: ${post.author.name}, content: ${post.content?.substring(0, post.content!.length > 30 ? 30 : post.content!.length)}');
                 }
-                
+
                 // Если Firestore пуст — используем локальные посты
                 var allPosts = posts;
                 if (allPosts.isEmpty) {
@@ -150,7 +151,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 padding: const EdgeInsets.only(bottom: 60),
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate(
-                    (context, index) => const ProjectCardSkeleton(),
+                    (context, index) => const PostCardSkeleton(),
                     childCount: 3,
                   ),
                 ),
@@ -216,14 +217,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Widget _buildLoadingIndicator() {
     if (!_isLoading) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Center(
-        child: CircularProgressIndicator(
-          strokeWidth: 2,
-          valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-        ),
-      ),
+    return const Padding(
+      padding: EdgeInsets.all(24),
+      child: PostCardSkeleton(),
     );
   }
 

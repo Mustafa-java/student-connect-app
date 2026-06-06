@@ -209,7 +209,8 @@ class PostCardSkeleton extends StatelessWidget {
           Shimmer.fromColors(
             baseColor: AppColors.skeleton,
             highlightColor: AppColors.skeletonHighlight,
-            child: Container(height: 350, width: double.infinity, color: Colors.white),
+            child: Container(
+                height: 350, width: double.infinity, color: Colors.white),
           ),
           Padding(
             padding: const EdgeInsets.all(12),
@@ -241,7 +242,8 @@ class PostCardSkeleton extends StatelessWidget {
       child: Container(
         width: width,
         height: height,
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(4)),
+        decoration: BoxDecoration(
+            color: Colors.white, borderRadius: BorderRadius.circular(4)),
       ),
     );
   }
@@ -261,7 +263,7 @@ class ProfileGridSkeleton extends StatelessWidget {
         crossAxisSpacing: 2,
         mainAxisSpacing: 2,
       ),
-            itemCount: 9,
+      itemCount: 9,
       itemBuilder: (context, index) {
         return Shimmer.fromColors(
           baseColor: AppColors.skeleton,
@@ -274,3 +276,5 @@ class ProfileGridSkeleton extends StatelessWidget {
     );
   }
 }
+
+/// Skeleton для карточки поста
