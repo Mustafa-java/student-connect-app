@@ -250,43 +250,143 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   void _showGroupInfo() {
+    final currentUser = ref.read(currentUserProvider);
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.surfaceDark,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircleAvatar(
-                radius: 32,
-                backgroundColor: AppColors.primary,
-                child: const Icon(Icons.groups_rounded,
-                    color: Colors.white, size: 32),
+      builder: (context) => FutureBuilder<Map<String, dynamic>?>(
+        future: ApiService.instance.getTeamByChat(widget.chat.id),
+        builder: (context, snapshot) {
+          final team = snapshot.data;
+          final teamId = team?['id']?.toString();
+          final creatorId = team?['creator_id']?.toString();
+          final isCreator = currentUser != null && creatorId == currentUser.id;
+
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const CircleAvatar(
+                    radius: 32,
+                    backgroundColor: AppColors.primary,
+                    child: Icon(Icons.groups_rounded,
+                        color: Colors.white, size: 32),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    widget.chat.displayTitle,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textDark,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '${widget.chat.participantsCount} участников',
+                    style: const TextStyle(color: AppColors.textDarkSecondary),
+                  ),
+                  const SizedBox(height: 16),
+                  if (teamId != null)
+                    _memberList(
+                        teamId: teamId,
+                        isCreator: isCreator,
+                        currentUser: currentUser),
+                ],
               ),
-              const SizedBox(height: 12),
-              Text(
-                widget.chat.displayTitle,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textDark,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                '${widget.chat.participantsCount} участников',
-                style: TextStyle(color: AppColors.textDarkSecondary),
-              ),
-              const SizedBox(height: 16),
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       ),
+    );
+  }
+
+  Widget _memberList({
+    required String teamId,
+    required bool isCreator,
+    required User? currentUser,
+  }) {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: ApiService.instance.getTeamMembers(teamId),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Padding(
+            padding: EdgeInsets.all(16),
+            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+          );
+        }
+        final members = snapshot.data ?? [];
+        if (members.isEmpty) return const SizedBox.shrink();
+
+        return ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: 300),
+          child: ListView.separated(
+            shrinkWrap: true,
+            itemCount: members.length,
+            separatorBuilder: (_, __) =>
+                const Divider(height: 1, color: AppColors.divider),
+            itemBuilder: (context, index) {
+              final member = members[index];
+              final memberId = member['id']?.toString() ?? '';
+              final name = member['name']?.toString() ?? 'Пользователь';
+              final avatarUrl = member['avatar_url']?.toString();
+              final canRemove = isCreator && memberId != currentUser?.id;
+
+              return ListTile(
+                leading: CircleAvatar(
+                  radius: 18,
+                  backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
+                      ? NetworkImage(avatarUrl)
+                      : null,
+                  child: avatarUrl == null || avatarUrl.isEmpty
+                      ? Text(name.isNotEmpty ? name[0].toUpperCase() : '?')
+                      : null,
+                ),
+                title: Text(name,
+                    style: const TextStyle(color: AppColors.textDark)),
+                trailing: canRemove
+                    ? IconButton(
+                        icon: const Icon(Icons.remove_circle_outline,
+                            color: AppColors.error, size: 20),
+                        onPressed: () async {
+                          Navigator.pop(context);
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              backgroundColor: AppColors.surfaceDark,
+                              title: const Text('Удалить участника?'),
+                              content: Text('Удалить $name из команды?'),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(ctx, false),
+                                  child: const Text('Отмена'),
+                                ),
+                                ElevatedButton(
+                                  onPressed: () => Navigator.pop(ctx, true),
+                                  style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.error),
+                                  child: const Text('Удалить'),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirm == true) {
+                            await ApiService.instance
+                                .removeTeamMember(teamId, memberId);
+                          }
+                        },
+                      )
+                    : null,
+              );
+            },
+          ),
+        );
+      },
     );
   }
 

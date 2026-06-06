@@ -32,6 +32,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   int _selectedTabIndex = 0;
+  List<Post> _savedPosts = [];
+  List<Project> _savedProjects = [];
+  bool _savedLoading = false;
 
   @override
   void initState() {
@@ -47,11 +50,30 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     super.dispose();
   }
 
+  Future<void> _loadSavedItems() async {
+    if (_savedLoading) return;
+    setState(() => _savedLoading = true);
+    final results = await Future.wait([
+      ApiService.instance.getSavedPosts(),
+      ApiService.instance.getSavedProjects(),
+    ]);
+    if (mounted) {
+      setState(() {
+        _savedPosts = results[0] as List<Post>;
+        _savedProjects = results[1] as List<Project>;
+        _savedLoading = false;
+      });
+    }
+  }
+
   void _onTabChanged() {
     if (!_tabController.indexIsChanging) {
       setState(() {
         _selectedTabIndex = _tabController.index;
       });
+      if (_tabController.index == 2) {
+        _loadSavedItems();
+      }
     }
   }
 
@@ -412,28 +434,43 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                     ),
             // Таб 2: Сохранённые
             if (_selectedTabIndex == 2)
-              SliverToBoxAdapter(
-                child: SizedBox(
-                  height: 300,
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.bookmark_border,
-                            size: 60, color: AppColors.textDarkSecondary),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Нет сохраненных',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: AppColors.textDarkSecondary,
+              _savedPosts.isEmpty && _savedProjects.isEmpty && !_savedLoading
+                  ? SliverToBoxAdapter(
+                      child: SizedBox(
+                        height: 300,
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.bookmark_border,
+                                  size: 60, color: AppColors.textDarkSecondary),
+                              const SizedBox(height: 16),
+                              Text(
+                                'Нет сохраненных',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: AppColors.textDarkSecondary,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
+                      ),
+                    )
+                  : SliverPadding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            if (index < _savedPosts.length) {
+                              return _buildPostListItem(_savedPosts[index]);
+                            }
+                            return const SizedBox.shrink();
+                          },
+                          childCount: _savedPosts.length,
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-              ),
             // Таб 3: О себе
             if (_selectedTabIndex == 3)
               SliverToBoxAdapter(

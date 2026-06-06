@@ -2,23 +2,95 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/widgets/custom_avatar.dart';
-import '../../models/models.dart';
-import '../../providers/app_providers.dart';
-import '../profile/other_user_profile_screen.dart';
-import '../post/post_detail_screen.dart';
-import '../project/project_detail_screen.dart';
+import '../../services/api_service.dart';
 
-/// Экран уведомлений
-class NotificationsScreen extends ConsumerWidget {
+class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // В будущем здесь будет реальный API
-    // Пока используем моковые данные для демонстрации
-    final notifications = _getMockNotifications();
+  ConsumerState<NotificationsScreen> createState() =>
+      _NotificationsScreenState();
+}
 
+class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
+  List<Map<String, dynamic>> _notifications = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNotifications();
+  }
+
+  Future<void> _loadNotifications() async {
+    setState(() => _loading = true);
+    final notifications = await ApiService.instance.getNotifications();
+    if (mounted) {
+      setState(() {
+        _notifications = notifications;
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _handleTeamInvite(
+      Map<String, dynamic> notification, bool accept) async {
+    final data = notification['data'] as Map<String, dynamic>?;
+    if (data == null) return;
+
+    final invitationId = data['invitation_id']?.toString();
+    if (invitationId == null) return;
+
+    try {
+      if (accept) {
+        await ApiService.instance.acceptTeamInvitation(invitationId);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Вы присоединились к команде'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+        }
+      } else {
+        await ApiService.instance.rejectTeamInvitation(invitationId);
+      }
+      _loadNotifications();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(accept ? 'Ошибка: $e' : 'Отклонено'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  String _timeAgo(dynamic createdAt) {
+    if (createdAt == null) return '';
+    int millis;
+    if (createdAt is int) {
+      millis = createdAt;
+    } else if (createdAt is String) {
+      millis = int.tryParse(createdAt) ?? 0;
+    } else {
+      return '';
+    }
+    final diff = DateTime.now().millisecondsSinceEpoch - millis;
+    final minutes = diff ~/ 60000;
+    if (minutes < 1) return 'Только что';
+    if (minutes < 60) return '$minutes мин';
+    final hours = minutes ~/ 60;
+    if (hours < 24) return '$hours ч';
+    final days = hours ~/ 24;
+    if (days < 7) return '$days дн';
+    return '${days ~/ 7} нед';
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.backgroundDark,
       body: CustomScrollView(
@@ -34,20 +106,25 @@ class NotificationsScreen extends ConsumerWidget {
               ),
             ),
           ),
-          if (notifications.isEmpty)
-            SliverToBoxAdapter(
-              child: _buildEmptyState(),
+          if (_loading)
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.all(40),
+                child: Center(child: CircularProgressIndicator()),
+              ),
             )
+          else if (_notifications.isEmpty)
+            SliverToBoxAdapter(child: _buildEmptyState())
           else
             SliverPadding(
               padding: const EdgeInsets.only(bottom: 60),
               sliver: SliverList(
                 delegate: SliverChildBuilderDelegate(
                   (context, index) {
-                    final notification = notifications[index];
-                    return _buildNotificationTile(context, ref, notification, index);
+                    final notification = _notifications[index];
+                    return _buildNotificationTile(notification, index);
                   },
-                  childCount: notifications.length,
+                  childCount: _notifications.length,
                 ),
               ),
             ),
@@ -61,11 +138,8 @@ class NotificationsScreen extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(vertical: 100),
       child: Column(
         children: [
-          Icon(
-            Icons.notifications_none_rounded,
-            size: 64,
-            color: AppColors.textDarkSecondary,
-          ),
+          Icon(Icons.notifications_none_rounded,
+              size: 64, color: AppColors.textDarkSecondary),
           const SizedBox(height: 16),
           const Text(
             'Нет уведомлений',
@@ -79,159 +153,136 @@ class NotificationsScreen extends ConsumerWidget {
           Text(
             'Здесь будут уведомления о новых лайках, комментариях и подписках',
             textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 14,
-              color: AppColors.textDarkSecondary,
-            ),
+            style: TextStyle(fontSize: 14, color: AppColors.textDarkSecondary),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildNotificationTile(
-    BuildContext context,
-    WidgetRef ref,
-    _Notification notification,
-    int index,
-  ) {
-    return ListTile(
-      leading: CustomAvatar(
-        radius: 24,
-        imageUrl: notification.avatarUrl,
-        hasStoryGradient: index < 2,
-      ),
-      title: RichText(
-        text: TextSpan(
-          style: const TextStyle(fontSize: 14, color: AppColors.textDark),
+  Widget _buildNotificationTile(Map<String, dynamic> notification, int index) {
+    final type = notification['type']?.toString() ?? '';
+    final data = notification['data'] as Map<String, dynamic>?;
+
+    if (type == 'team_invite') {
+      final teamName = data?['team_name']?.toString() ?? 'команду';
+      final fromUserName =
+          notification['from_user_name']?.toString() ?? 'Пользователь';
+      final fromUserAvatar = notification['from_user_avatar']?.toString();
+
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Row(
           children: [
-            TextSpan(
-              text: notification.userName,
-              style: const TextStyle(fontWeight: FontWeight.w600),
+            CircleAvatar(
+              radius: 22,
+              backgroundColor: AppColors.primary,
+              backgroundImage:
+                  fromUserAvatar != null && fromUserAvatar.isNotEmpty
+                      ? NetworkImage(fromUserAvatar)
+                      : null,
+              child: fromUserAvatar == null || fromUserAvatar.isEmpty
+                  ? Text(fromUserName.isNotEmpty
+                      ? fromUserName[0].toUpperCase()
+                      : '?')
+                  : null,
             ),
-            TextSpan(text: ' ${notification.message}'),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  RichText(
+                    text: TextSpan(
+                      style: const TextStyle(
+                          fontSize: 14, color: AppColors.textDark),
+                      children: [
+                        TextSpan(
+                          text: fromUserName,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        TextSpan(text: ' приглашает вас в команду "$teamName"'),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Text(
+                        _timeAgo(notification['created_at']),
+                        style: const TextStyle(
+                            fontSize: 12, color: AppColors.textDarkSecondary),
+                      ),
+                      const Spacer(),
+                      ElevatedButton(
+                        onPressed: () => _handleTeamInvite(notification, true),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.success,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 4),
+                          minimumSize: Size.zero,
+                        ),
+                        child: const Text('Вступить',
+                            style: TextStyle(fontSize: 12)),
+                      ),
+                      const SizedBox(width: 6),
+                      OutlinedButton(
+                        onPressed: () => _handleTeamInvite(notification, false),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 4),
+                          minimumSize: Size.zero,
+                          side: const BorderSide(
+                              color: AppColors.textDarkSecondary),
+                        ),
+                        child: const Text('Отклонить',
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textDarkSecondary)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
-      ),
-      subtitle: Padding(
-        padding: const EdgeInsets.only(top: 4),
-        child: Text(
-          notification.timeAgo,
-          style: TextStyle(
-            fontSize: 12,
-            color: AppColors.textDarkSecondary,
-          ),
+      )
+          .animate()
+          .fadeIn(
+            duration: const Duration(milliseconds: 300),
+            delay: Duration(milliseconds: index * 50),
+          )
+          .slideX(begin: 0.1, end: 0);
+    }
+
+    // Другие типы уведомлений (заглушка)
+    return ListTile(
+      leading: CircleAvatar(
+        radius: 22,
+        backgroundColor: AppColors.surfaceDark,
+        child: Icon(
+          type == 'like'
+              ? Icons.favorite
+              : type == 'comment'
+                  ? Icons.comment
+                  : Icons.notifications,
+          color: AppColors.primary,
+          size: 20,
         ),
       ),
-      trailing: notification.icon != null
-          ? Icon(
-              notification.icon,
-              size: 20,
-              color: notification.iconColor,
-            )
-          : null,
-      onTap: () => _handleNotificationTap(context, ref, notification),
-    )
-        .animate()
-        .fadeIn(
+      title: Text(
+        'Уведомление: $type',
+        style: const TextStyle(color: AppColors.textDark, fontSize: 14),
+      ),
+      subtitle: Text(
+        _timeAgo(notification['created_at']),
+        style:
+            const TextStyle(fontSize: 12, color: AppColors.textDarkSecondary),
+      ),
+    ).animate().fadeIn(
           duration: const Duration(milliseconds: 300),
           delay: Duration(milliseconds: index * 50),
-        )
-        .slideX(begin: 0.1, end: 0);
-  }
-
-  void _handleNotificationTap(
-    BuildContext context,
-    WidgetRef ref,
-    _Notification notification,
-  ) {
-    switch (notification.type) {
-      case NotificationType.like:
-      case NotificationType.comment:
-        // Переход к посту (если есть данные поста)
-        if (notification.relatedPost != null) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => PostDetailScreen(post: notification.relatedPost!),
-            ),
-          );
-        }
-        break;
-
-      case NotificationType.follow:
-        // Переход к профилю пользователя
-        if (notification.relatedUser != null) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => OtherUserProfileScreen(user: notification.relatedUser!),
-            ),
-          );
-        }
-        break;
-
-      case NotificationType.projectLike:
-        // Переход к проекту
-        if (notification.relatedProject != null) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => ProjectDetailScreen(project: notification.relatedProject!),
-            ),
-          );
-        }
-        break;
-
-      default:
-        // Для остальных типов показываем уведомление
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Функция в разработке'),
-            duration: Duration(seconds: 1),
-          ),
         );
-    }
   }
-
-  List<_Notification> _getMockNotifications() {
-    // В реальном приложении здесь будет API вызов
-    // Пока возвращаем пустой список, чтобы показать пустое состояние
-    // Можно добавить моковые данные для демонстрации
-    return [];
-  }
-}
-
-enum NotificationType {
-  like,
-  comment,
-  follow,
-  projectLike,
-  message,
-}
-
-class _Notification {
-  final String userName;
-  final String avatarUrl;
-  final String message;
-  final String timeAgo;
-  final IconData? icon;
-  final Color? iconColor;
-  final NotificationType type;
-  final Post? relatedPost;
-  final User? relatedUser;
-  final Project? relatedProject;
-
-  const _Notification({
-    required this.userName,
-    required this.avatarUrl,
-    required this.message,
-    required this.timeAgo,
-    required this.type,
-    this.icon,
-    this.iconColor,
-    this.relatedPost,
-    this.relatedUser,
-    this.relatedProject,
-  });
 }

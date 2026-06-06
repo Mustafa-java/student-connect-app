@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 import '../../providers/app_providers.dart';
+import '../../services/api_service.dart';
 import '../../core/widgets/skeletons.dart';
 import '../../core/utils/page_transitions.dart';
 import '../project/create_project_screen.dart';
@@ -22,11 +23,21 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   final ScrollController _scrollController = ScrollController();
   bool _isLoading = false;
+  int _unreadNotifications = 0;
 
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+    _fetchUnreadNotifications();
+  }
+
+  Future<void> _fetchUnreadNotifications() async {
+    try {
+      final response = await ApiService.instance.getNotifications();
+      final unread = response.where((n) => n['is_read'] != true).length;
+      if (mounted) setState(() => _unreadNotifications = unread);
+    } catch (_) {}
   }
 
   @override
@@ -90,14 +101,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 IconButton(
                   icon: Badge(
                     smallSize: 8,
+                    isLabelVisible: _unreadNotifications > 0,
+                    label: _unreadNotifications > 0
+                        ? Text(
+                            '$_unreadNotifications',
+                            style: const TextStyle(fontSize: 9),
+                          )
+                        : null,
                     child: const Icon(Icons.favorite_border),
                   ),
                   iconSize: 24,
-                  onPressed: () {
-                    Navigator.push(
+                  onPressed: () async {
+                    await Navigator.push(
                       context,
                       slideTransition(const NotificationsScreen()),
                     );
+                    _fetchUnreadNotifications();
                   },
                 ),
               ],

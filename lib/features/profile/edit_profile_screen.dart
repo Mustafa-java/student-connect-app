@@ -69,9 +69,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   Future<void> _pickAvatar() async {
     try {
       final picker = ImagePicker();
-      
+
       if (!mounted) return;
-      
+
       // Показываем индикатор загрузки
       showDialog(
         context: context,
@@ -80,7 +80,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           child: CircularProgressIndicator(),
         ),
       );
-      
+
       final XFile? image = await picker.pickImage(
         source: ImageSource.gallery,
         maxWidth: 512,
@@ -90,7 +90,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
       if (!mounted) return;
       Navigator.pop(context); // Убираем индикатор
-      
+
       if (image == null) return;
 
       debugPrint('Selected image path: ${image.path}');
@@ -101,7 +101,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       if (!await avatarsDir.exists()) {
         await avatarsDir.create(recursive: true);
       }
-      
+
       // Удаляем старые аватары текущего пользователя
       final user = ref.read(currentUserProvider);
       if (user != null) {
@@ -117,7 +117,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           debugPrint('Error deleting old avatar: $e');
         }
       }
-      
+
       final fileName = 'avatar_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final savedFile = File('${avatarsDir.path}/$fileName');
 
@@ -132,7 +132,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       setState(() {
         _avatarFile = savedFile;
       });
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -148,7 +148,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('Ошибка загрузки аватара: $e'), 
+              content: Text('Ошибка загрузки аватара: $e'),
               backgroundColor: AppColors.error),
         );
       }
@@ -169,10 +169,19 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     try {
       final user = await ApiService.instance.updateProfile({
         'name': _nameController.text.trim(),
-        'bio': _bioController.text.trim().isEmpty ? null : _bioController.text.trim(),
-        'university': _universityController.text.trim().isEmpty ? null : _universityController.text.trim(),
-        'faculty': _facultyController.text.trim().isEmpty ? null : _facultyController.text.trim(),
-        'course': _courseController.text.trim().isEmpty ? null : _courseController.text.trim(),
+        'bio': _bioController.text.trim().isEmpty
+            ? null
+            : _bioController.text.trim(),
+        'university': _universityController.text.trim().isEmpty
+            ? null
+            : _universityController.text.trim(),
+        'faculty': _facultyController.text.trim().isEmpty
+            ? null
+            : _facultyController.text.trim(),
+        'course': _courseController.text.trim().isEmpty
+            ? null
+            : _courseController.text.trim(),
+        'skills': _selectedSkills.toList(),
         'avatar_url': avatarPath,
       });
       ref.read(currentUserProvider.notifier).updateUser(user);

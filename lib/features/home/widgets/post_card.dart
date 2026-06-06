@@ -37,6 +37,13 @@ class _PostCardState extends State<PostCard>
   final CarouselSliderController _carouselController =
       CarouselSliderController();
   bool _showHeartAnimation = false;
+  bool _isSaved = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _isSaved = widget.post.isSaved;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -546,11 +553,13 @@ class _PostCardState extends State<PostCard>
               ),
               const Spacer(),
               GestureDetector(
-                onTap: () {
-                  // TODO: сохранить в Firebase
+                onTap: () async {
+                  final saved =
+                      await ApiService.instance.toggleSavePost(widget.post.id);
+                  if (mounted) setState(() => _isSaved = saved);
                 },
                 child: Icon(
-                  Icons.bookmark_border,
+                  _isSaved ? Icons.bookmark : Icons.bookmark_border,
                   size: 24,
                   color: AppColors.textDark,
                 ),

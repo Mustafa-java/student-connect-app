@@ -88,6 +88,13 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
   final TextEditingController _commentController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    _isLiked = widget.post.isLiked;
+    _isSaved = widget.post.isSaved;
+  }
+
+  @override
   void dispose() {
     _commentController.dispose();
     super.dispose();
@@ -756,7 +763,11 @@ ${contentPreview.isNotEmpty ? '\n$contentPreview' : ''}
           ),
           const Spacer(),
           GestureDetector(
-            onTap: () => setState(() => _isSaved = !_isSaved),
+            onTap: () async {
+              final saved =
+                  await ApiService.instance.toggleSavePost(widget.post.id);
+              if (mounted) setState(() => _isSaved = saved);
+            },
             child: AnimatedScale(
               scale: _isSaved ? 1.2 : 1.0,
               duration: const Duration(milliseconds: 150),

@@ -47,6 +47,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     super.initState();
     _project = widget.project;
     _isLiked = widget.project.isLiked;
+    _isSaved = widget.project.isSaved;
   }
 
   @override
@@ -1158,7 +1159,11 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           ),
           const Spacer(),
           GestureDetector(
-            onTap: () => setState(() => _isSaved = !_isSaved),
+            onTap: () async {
+              final saved =
+                  await ApiService.instance.toggleSaveProject(_project.id);
+              if (mounted) setState(() => _isSaved = saved);
+            },
             child: AnimatedScale(
               scale: _isSaved ? 1.2 : 1.0,
               duration: const Duration(milliseconds: 150),

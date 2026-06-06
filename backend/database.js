@@ -203,6 +203,38 @@ async function initDatabase() {
       )
     `);
 
+    // Saved posts table - сохранённые посты
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS saved_posts (
+        post_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        created_at BIGINT DEFAULT EXTRACT(EPOCH FROM NOW()) * 1000,
+        PRIMARY KEY (post_id, user_id)
+      )
+    `);
+
+    // Saved projects table - сохранённые проекты
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS saved_projects (
+        project_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        created_at BIGINT DEFAULT EXTRACT(EPOCH FROM NOW()) * 1000,
+        PRIMARY KEY (project_id, user_id)
+      )
+    `);
+
+    // Notifications table - уведомления
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS notifications (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        type TEXT NOT NULL,
+        data TEXT DEFAULT '{}',
+        is_read BOOLEAN DEFAULT false,
+        created_at BIGINT DEFAULT EXTRACT(EPOCH FROM NOW()) * 1000
+      )
+    `);
+
     console.log('✅ Database schema initialized successfully');
   } catch (error) {
     console.error('❌ Error initializing database:', error);

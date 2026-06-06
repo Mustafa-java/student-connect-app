@@ -1107,4 +1107,124 @@ class ApiService {
       return false;
     }
   }
+
+  /// ==================== BOOKMARKS ====================
+
+  Future<bool> toggleSavePost(String postId) async {
+    try {
+      final response = await _dio.post('/api/posts/$postId/save');
+      final data = response.data as Map<String, dynamic>;
+      return data['is_saved'] ?? false;
+    } catch (e) {
+      debugPrint('toggleSavePost error: $e');
+      return false;
+    }
+  }
+
+  Future<bool> toggleSaveProject(String projectId) async {
+    try {
+      final response = await _dio.post('/api/projects/$projectId/save');
+      final data = response.data as Map<String, dynamic>;
+      return data['is_saved'] ?? false;
+    } catch (e) {
+      debugPrint('toggleSaveProject error: $e');
+      return false;
+    }
+  }
+
+  Future<List<Post>> getSavedPosts() async {
+    try {
+      final response = await _dio.get('/api/saved/posts');
+      final data = response.data as Map<String, dynamic>;
+      return (data['posts'] as List)
+          .map((p) => _parsePost(p as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      debugPrint('getSavedPosts error: $e');
+      return [];
+    }
+  }
+
+  Future<List<Project>> getSavedProjects() async {
+    try {
+      final response = await _dio.get('/api/saved/projects');
+      final data = response.data as Map<String, dynamic>;
+      return (data['projects'] as List)
+          .map((p) => _parseProject(p as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      debugPrint('getSavedProjects error: $e');
+      return [];
+    }
+  }
+
+  /// ==================== NOTIFICATIONS ====================
+
+  Future<List<Map<String, dynamic>>> getNotifications() async {
+    try {
+      final response = await _dio.get('/api/notifications');
+      final data = response.data as Map<String, dynamic>;
+      return List<Map<String, dynamic>>.from(data['notifications'] ?? []);
+    } catch (e) {
+      debugPrint('getNotifications error: $e');
+      return [];
+    }
+  }
+
+  Future<void> markNotificationRead(String notificationId) async {
+    try {
+      await _dio.post('/api/notifications/$notificationId/read');
+    } catch (e) {
+      debugPrint('markNotificationRead error: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> acceptTeamInvitation(String invitationId) async {
+    final response =
+        await _dio.post('/api/team-invitations/$invitationId/accept');
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> rejectTeamInvitation(String invitationId) async {
+    final response =
+        await _dio.post('/api/team-invitations/$invitationId/reject');
+    return response.data as Map<String, dynamic>;
+  }
+
+  /// ==================== TEAM MEMBER MANAGEMENT ====================
+
+  Future<bool> removeTeamMember(String teamId, String userId) async {
+    try {
+      final response =
+          await _dio.post('/api/teams/$teamId/remove-member', data: {
+        'user_id': userId,
+      });
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('removeTeamMember error: $e');
+      return false;
+    }
+  }
+
+  Future<Map<String, dynamic>?> getTeamByChat(String chatId) async {
+    try {
+      final response = await _dio.get('/api/teams/by-chat/$chatId');
+      final data = response.data as Map<String, dynamic>;
+      return data['team'] as Map<String, dynamic>?;
+    } catch (e) {
+      debugPrint('getTeamByChat error: $e');
+      return null;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getTeamMembers(String teamId) async {
+    try {
+      final response = await _dio.get('/api/teams/$teamId/members');
+      final data = response.data as Map<String, dynamic>;
+      return List<Map<String, dynamic>>.from(data['members'] ?? []);
+    } catch (e) {
+      debugPrint('getTeamMembers error: $e');
+      return [];
+    }
+  }
 }

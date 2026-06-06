@@ -59,7 +59,7 @@ class _TeamSelectionDialogState extends ConsumerState<TeamSelectionDialog> {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${widget.userName} приглашен в команду'),
+            content: Text('Приглашение отправлено ${widget.userName}'),
             backgroundColor: AppColors.success,
           ),
         );
@@ -86,7 +86,7 @@ class _TeamSelectionDialogState extends ConsumerState<TeamSelectionDialog> {
     }
 
     try {
-      final result = await ApiService.instance.createTeam(
+      await ApiService.instance.createTeam(
         name: teamName,
         memberIds: [widget.userId],
       );

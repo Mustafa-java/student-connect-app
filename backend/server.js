@@ -304,6 +304,22 @@ async function enrichPost(postId, userId) {
   return likeResult.rows.length > 0;
 }
 
+async function enrichPostSaved(postId, userId) {
+  const result = await pool.query(
+    'SELECT 1 FROM saved_posts WHERE post_id = $1 AND user_id = $2',
+    [postId, userId]
+  );
+  return result.rows.length > 0;
+}
+
+async function enrichProjectSaved(projectId, userId) {
+  const result = await pool.query(
+    'SELECT 1 FROM saved_projects WHERE project_id = $1 AND user_id = $2',
+    [projectId, userId]
+  );
+  return result.rows.length > 0;
+}
+
 app.get('/api/posts', authMiddleware, async (req, res) => {
   try {
     const result = await pool.query(`
@@ -320,7 +336,8 @@ app.get('/api/posts', authMiddleware, async (req, res) => {
       ...p,
       images: JSON.stringify(convertImageUrls(p.images, baseUrl)),
       author_skills: JSON.parse(p.author_skills || '[]'),
-      is_liked: await enrichPost(p.id, req.userId)
+      is_liked: await enrichPost(p.id, req.userId),
+      is_saved: await enrichPostSaved(p.id, req.userId)
     })));
 
     res.json({ posts });
@@ -366,6 +383,7 @@ app.post('/api/posts', authMiddleware, uploadImages.array('images', 5), async (r
     post.images = JSON.stringify(convertImageUrls(post.images, baseUrl));
     post.author_skills = JSON.parse(post.author_skills || '[]');
     post.is_liked = await enrichPost(post.id, req.userId);
+    post.is_saved = await enrichPostSaved(post.id, req.userId);
 
     console.log('Post created with images:', imageUrls);
     res.status(201).json({ post });
@@ -468,11 +486,99 @@ app.put('/api/posts/:id', authMiddleware, async (req, res) => {
     post.images = JSON.stringify(convertImageUrls(post.images, baseUrl));
     post.author_skills = JSON.parse(post.author_skills || '[]');
     post.is_liked = await enrichPost(post.id, req.userId);
+    post.is_saved = await enrichPostSaved(post.id, req.userId);
     
     console.log('Post updated:', id);
     res.json({ post });
   } catch(e) {
     console.error('Update post error:', e);
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+// ==================== POST SAVE/UNSAVE ====================
+
+app.post('/api/posts/:id/save', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const check = await pool.query(
+      'SELECT 1 FROM saved_posts WHERE post_id = $1 AND user_id = $2',
+      [id, req.userId]
+    );
+
+    if (check.rows.length > 0) {
+      await pool.query('DELETE FROM saved_posts WHERE post_id = $1 AND user_id = $2', [id, req.userId]);
+    } else {
+      await pool.query('INSERT INTO saved_posts (post_id, user_id) VALUES ($1, $2)', [id, req.userId]);
+    }
+
+    const isSaved = await enrichPostSaved(id, req.userId);
+    res.json({ is_saved: isSaved });
+  } catch(e) {
+    console.error('Save post error:', e);
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+// ==================== GET SAVED ITEMS ====================
+
+app.get('/api/saved/posts', authMiddleware, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT p.*, u.name as author_name, u.email as author_email, u.avatar_url as author_avatar,
+             u.university as author_university, u.is_online as author_is_online,
+             u.skills as author_skills, u.projects_count as author_projects_count,
+             u.followers_count as author_followers_count, u.following_count as author_following_count
+      FROM posts p
+      JOIN users u ON p.author_id = u.id
+      JOIN saved_posts sp ON sp.post_id = p.id
+      WHERE sp.user_id = $1
+      ORDER BY sp.created_at DESC
+    `, [req.userId]);
+
+    const baseUrl = getBaseUrl(req);
+    const posts = await Promise.all(result.rows.map(async (p) => ({
+      ...p,
+      images: JSON.stringify(convertImageUrls(p.images, baseUrl)),
+      author_skills: JSON.parse(p.author_skills || '[]'),
+      is_liked: await enrichPost(p.id, req.userId),
+      is_saved: true
+    })));
+
+    res.json({ posts });
+  } catch(e) {
+    console.error('Get saved posts error:', e);
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+app.get('/api/saved/projects', authMiddleware, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT p.*, u.name as author_name, u.email as author_email, u.avatar_url as author_avatar,
+             u.university as author_university, u.is_online as author_is_online,
+             u.skills as author_skills, u.projects_count as author_projects_count,
+             u.followers_count as author_followers_count, u.following_count as author_following_count
+      FROM projects p
+      JOIN users u ON p.author_id = u.id
+      JOIN saved_projects sp ON sp.project_id = p.id
+      WHERE sp.user_id = $1
+      ORDER BY sp.created_at DESC
+    `, [req.userId]);
+
+    const baseUrl = getBaseUrl(req);
+    const projects = await Promise.all(result.rows.map(async (p) => ({
+      ...p,
+      images: JSON.stringify(convertImageUrls(p.images, baseUrl)),
+      author_skills: JSON.parse(p.author_skills || '[]'),
+      team_members: JSON.parse(p.team_members || '[]'),
+      is_liked: await enrichProject(p.id, req.userId),
+      is_saved: true
+    })));
+
+    res.json({ projects });
+  } catch(e) {
+    console.error('Get saved projects error:', e);
     res.status(500).json({ error: 'Ошибка' });
   }
 });
@@ -550,7 +656,8 @@ app.get('/api/projects', authMiddleware, async (req, res) => {
       images: JSON.stringify(convertImageUrls(p.images, baseUrl)),
       author_skills: JSON.parse(p.author_skills || '[]'),
       team_members: JSON.parse(p.team_members || '[]'),
-      is_liked: await enrichProject(p.id, req.userId)
+      is_liked: await enrichProject(p.id, req.userId),
+      is_saved: await enrichProjectSaved(p.id, req.userId)
     })));
 
     res.json({ projects });
@@ -614,6 +721,7 @@ app.post('/api/projects', authMiddleware, uploadImages.array('images', 5), async
     project.author_skills = JSON.parse(project.author_skills || '[]');
     project.team_members = JSON.parse(project.team_members || '[]');
     project.is_liked = await enrichProject(project.id, req.userId);
+    project.is_saved = await enrichProjectSaved(project.id, req.userId);
 
     console.log('Project created with images:', imageUrls);
     res.status(201).json({ project });
@@ -735,11 +843,36 @@ app.put('/api/projects/:id', authMiddleware, async (req, res) => {
     project.author_skills = JSON.parse(project.author_skills || '[]');
     project.team_members = JSON.parse(project.team_members || '[]');
     project.is_liked = await enrichProject(project.id, req.userId);
+    project.is_saved = await enrichProjectSaved(project.id, req.userId);
     
     console.log('Project updated:', id);
     res.json({ project });
   } catch(e) {
     console.error('Update project error:', e);
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+// ==================== PROJECT SAVE/UNSAVE ====================
+
+app.post('/api/projects/:id/save', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const check = await pool.query(
+      'SELECT 1 FROM saved_projects WHERE project_id = $1 AND user_id = $2',
+      [id, req.userId]
+    );
+
+    if (check.rows.length > 0) {
+      await pool.query('DELETE FROM saved_projects WHERE project_id = $1 AND user_id = $2', [id, req.userId]);
+    } else {
+      await pool.query('INSERT INTO saved_projects (project_id, user_id) VALUES ($1, $2)', [id, req.userId]);
+    }
+
+    const isSaved = await enrichProjectSaved(id, req.userId);
+    res.json({ is_saved: isSaved });
+  } catch(e) {
+    console.error('Save project error:', e);
     res.status(500).json({ error: 'Ошибка' });
   }
 });
@@ -1235,7 +1368,7 @@ app.get('/api/teams/my', authMiddleware, async (req, res) => {
   }
 });
 
-// Пригласить пользователя в команду
+// Пригласить пользователя в команду (создаёт уведомление)
 app.post('/api/teams/:teamId/invite', authMiddleware, async (req, res) => {
   try {
     const { teamId } = req.params;
@@ -1264,36 +1397,34 @@ app.post('/api/teams/:teamId/invite', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Пользователь уже в команде' });
     }
     
-    // Добавляем пользователя в команду
-    members.push(user_id);
+    // Создаём приглашение
+    const invitationId = uuidv4();
     await pool.query(
-      'UPDATE teams SET members = $1 WHERE id = $2',
-      [JSON.stringify(members), teamId]
+      'INSERT INTO team_invitations (id, team_id, from_user_id, to_user_id, status) VALUES ($1, $2, $3, $4, $5)',
+      [invitationId, teamId, req.userId, user_id, 'pending']
     );
     
-    // Добавляем пользователя в групповой чат
-    const chatResult = await pool.query('SELECT * FROM chats WHERE id = $1', [team.chat_id]);
-    if (chatResult.rows.length > 0) {
-      const chat = chatResult.rows[0];
-      const participantIds = parseParticipantIds(chat.participant_ids);
-      if (!participantIds.includes(user_id)) {
-        participantIds.push(user_id);
-        await pool.query(
-          'UPDATE chats SET participant_ids = $1 WHERE id = $2',
-          [JSON.stringify(participantIds), team.chat_id]
-        );
-        
-        // Добавляем unread для нового участника
-        await pool.query(
-          'INSERT INTO chat_unread (chat_id, user_id, unread_count) VALUES ($1, $2, $3) ON CONFLICT (chat_id, user_id) DO NOTHING',
-          [team.chat_id, user_id, 0]
-        );
-      }
-    }
+    // Создаём уведомление для приглашённого пользователя
+    const notificationId = uuidv4();
+    await pool.query(
+      `INSERT INTO notifications (id, user_id, type, data) VALUES ($1, $2, $3, $4)`,
+      [notificationId, user_id, 'team_invite', JSON.stringify({
+        invitation_id: invitationId,
+        team_id: teamId,
+        team_name: team.name,
+        from_user_id: req.userId
+      })]
+    );
     
-    const updatedTeam = await pool.query('SELECT * FROM teams WHERE id = $1', [teamId]);
+    // Получаем имя приглашающего для ответа
+    const userResult = await pool.query('SELECT name FROM users WHERE id = $1', [req.userId]);
+    const fromUserName = userResult.rows[0]?.name || 'Пользователь';
     
-    res.json({ team: updatedTeam.rows[0] });
+    res.json({
+      ok: true,
+      invitation_id: invitationId,
+      message: `Приглашение отправлено пользователю`
+    });
   } catch(e) {
     console.error('Invite to team error:', e);
     res.status(500).json({ error: 'Ошибка приглашения' });
@@ -1343,6 +1474,237 @@ app.post('/api/teams/:teamId/leave', authMiddleware, async (req, res) => {
     res.json({ ok: true });
   } catch(e) {
     console.error('Leave team error:', e);
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+// Получить команду по ID чата
+app.get('/api/teams/by-chat/:chatId', authMiddleware, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM teams WHERE chat_id = $1', [req.params.chatId]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Команда не найдена' });
+    }
+    res.json({ team: result.rows[0] });
+  } catch(e) {
+    console.error('Get team by chat error:', e);
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+// Получить участников команды с деталями
+app.get('/api/teams/:teamId/members', authMiddleware, async (req, res) => {
+  try {
+    const { teamId } = req.params;
+    const teamResult = await pool.query('SELECT * FROM teams WHERE id = $1', [teamId]);
+    if (teamResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Команда не найдена' });
+    }
+    const team = teamResult.rows[0];
+    const members = JSON.parse(team.members || '[]');
+    
+    if (members.length === 0) {
+      return res.json({ members: [] });
+    }
+    
+    const userResult = await pool.query(
+      `SELECT id, name, email, avatar_url, university, is_online FROM users WHERE id = ANY($1)`,
+      [members]
+    );
+    
+    res.json({ members: userResult.rows, creator_id: team.creator_id });
+  } catch(e) {
+    console.error('Get team members error:', e);
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+// Удалить участника из команды (только создатель)
+app.post('/api/teams/:teamId/remove-member', authMiddleware, async (req, res) => {
+  try {
+    const { teamId } = req.params;
+    const { user_id } = req.body;
+    
+    if (!user_id) {
+      return res.status(400).json({ error: 'user_id обязателен' });
+    }
+    
+    const teamResult = await pool.query('SELECT * FROM teams WHERE id = $1', [teamId]);
+    if (teamResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Команда не найдена' });
+    }
+    
+    const team = teamResult.rows[0];
+    
+    if (team.creator_id !== req.userId) {
+      return res.status(403).json({ error: 'Только создатель команды может удалять участников' });
+    }
+    
+    if (user_id === req.userId) {
+      return res.status(400).json({ error: 'Используйте выход из команды' });
+    }
+    
+    let members = JSON.parse(team.members || '[]');
+    if (!members.includes(user_id)) {
+      return res.status(400).json({ error: 'Пользователь не в команде' });
+    }
+    
+    members = members.filter(id => id !== user_id);
+    await pool.query('UPDATE teams SET members = $1 WHERE id = $2', [JSON.stringify(members), teamId]);
+    
+    if (team.chat_id) {
+      const chatResult = await pool.query('SELECT * FROM chats WHERE id = $1', [team.chat_id]);
+      if (chatResult.rows.length > 0) {
+        const participantIds = parseParticipantIds(chatResult.rows[0].participant_ids)
+          .filter(id => id !== user_id);
+        await pool.query('UPDATE chats SET participant_ids = $1 WHERE id = $2', [JSON.stringify(participantIds), team.chat_id]);
+        await pool.query('DELETE FROM chat_unread WHERE chat_id = $1 AND user_id = $2', [team.chat_id, user_id]);
+      }
+    }
+    
+    res.json({ ok: true });
+  } catch(e) {
+    console.error('Remove member error:', e);
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+// ==================== NOTIFICATIONS ====================
+
+// Получить уведомления пользователя
+app.get('/api/notifications', authMiddleware, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT n.*, u.name as from_user_name, u.avatar_url as from_user_avatar,
+              t.name as team_name
+       FROM notifications n
+       LEFT JOIN users u ON u.id = n.data::jsonb->>'from_user_id'
+       LEFT JOIN teams t ON t.id = n.data::jsonb->>'team_id'
+       WHERE n.user_id = $1
+       ORDER BY n.created_at DESC LIMIT 50`,
+      [req.userId]
+    );
+    
+    res.json({ notifications: result.rows });
+  } catch(e) {
+    console.error('Get notifications error:', e);
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+// Отметить уведомление как прочитанное
+app.post('/api/notifications/:id/read', authMiddleware, async (req, res) => {
+  try {
+    await pool.query(
+      'UPDATE notifications SET is_read = true WHERE id = $1 AND user_id = $2',
+      [req.params.id, req.userId]
+    );
+    res.json({ ok: true });
+  } catch(e) {
+    console.error('Mark notification read error:', e);
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+// Получить количество непрочитанных уведомлений
+app.get('/api/notifications/unread-count', authMiddleware, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT COUNT(*) as count FROM notifications WHERE user_id = $1 AND is_read = false',
+      [req.userId]
+    );
+    res.json({ count: parseInt(result.rows[0]?.count || '0') });
+  } catch(e) {
+    console.error('Unread count error:', e);
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+// ==================== TEAM INVITATIONS (with notifications) ====================
+
+// Принять приглашение
+app.post('/api/team-invitations/:id/accept', authMiddleware, async (req, res) => {
+  try {
+    const invResult = await pool.query(
+      'SELECT * FROM team_invitations WHERE id = $1 AND to_user_id = $2 AND status = $3',
+      [req.params.id, req.userId, 'pending']
+    );
+    
+    if (invResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Приглашение не найдено' });
+    }
+    
+    const inv = invResult.rows[0];
+    
+    // Добавляем пользователя в команду
+    const teamResult = await pool.query('SELECT * FROM teams WHERE id = $1', [inv.team_id]);
+    if (teamResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Команда не найдена' });
+    }
+    
+    const team = teamResult.rows[0];
+    let members = JSON.parse(team.members || '[]');
+    if (!members.includes(req.userId)) {
+      members.push(req.userId);
+      await pool.query('UPDATE teams SET members = $1 WHERE id = $2', [JSON.stringify(members), team.id]);
+    }
+    
+    // Добавляем в чат
+    if (team.chat_id) {
+      const chatResult = await pool.query('SELECT * FROM chats WHERE id = $1', [team.chat_id]);
+      if (chatResult.rows.length > 0) {
+        const chat = chatResult.rows[0];
+        let participantIds = parseParticipantIds(chat.participant_ids);
+        if (!participantIds.includes(req.userId)) {
+          participantIds.push(req.userId);
+          await pool.query('UPDATE chats SET participant_ids = $1 WHERE id = $2', [JSON.stringify(participantIds), team.chat_id]);
+        }
+        await pool.query(
+          'INSERT INTO chat_unread (chat_id, user_id, unread_count) VALUES ($1, $2, $3) ON CONFLICT (chat_id, user_id) DO NOTHING',
+          [team.chat_id, req.userId, 0]
+        );
+      }
+    }
+    
+    // Обновляем статус приглашения
+    await pool.query('UPDATE team_invitations SET status = $1 WHERE id = $2', ['accepted', req.params.id]);
+    
+    // Удаляем уведомление
+    await pool.query(
+      "DELETE FROM notifications WHERE user_id = $1 AND type = 'team_invite' AND data::jsonb->>'invitation_id' = $2",
+      [req.userId, req.params.id]
+    );
+    
+    res.json({ ok: true, team_id: inv.team_id });
+  } catch(e) {
+    console.error('Accept invitation error:', e);
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+// Отклонить приглашение
+app.post('/api/team-invitations/:id/reject', authMiddleware, async (req, res) => {
+  try {
+    const invResult = await pool.query(
+      'SELECT * FROM team_invitations WHERE id = $1 AND to_user_id = $2 AND status = $3',
+      [req.params.id, req.userId, 'pending']
+    );
+    
+    if (invResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Приглашение не найдено' });
+    }
+    
+    await pool.query('UPDATE team_invitations SET status = $1 WHERE id = $2', ['rejected', req.params.id]);
+    
+    // Удаляем уведомление
+    await pool.query(
+      "DELETE FROM notifications WHERE user_id = $1 AND type = 'team_invite' AND data::jsonb->>'invitation_id' = $2",
+      [req.userId, req.params.id]
+    );
+    
+    res.json({ ok: true });
+  } catch(e) {
+    console.error('Reject invitation error:', e);
     res.status(500).json({ error: 'Ошибка' });
   }
 });
