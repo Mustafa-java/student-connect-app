@@ -217,7 +217,8 @@ class ProjectCard extends ConsumerWidget {
                         GestureDetector(
                           onTap: () {
                             final currentUser = ref.read(currentUserProvider);
-                            if (currentUser != null && project.author.id == currentUser.id) {
+                            if (currentUser != null &&
+                                project.author.id == currentUser.id) {
                               // Переход к своему профилю
                               Navigator.push(
                                 context,
@@ -231,7 +232,7 @@ class ProjectCard extends ConsumerWidget {
                                 context,
                                 MaterialPageRoute(
                                   builder: (context) => OtherUserProfileScreen(
-                                    userId: project.author.id,
+                                    user: project.author,
                                   ),
                                 ),
                               );
@@ -242,7 +243,8 @@ class ProjectCard extends ConsumerWidget {
                               CircleAvatar(
                                 radius: 10,
                                 backgroundImage: NetworkImage(
-                                  (project.author.avatarUrl == null || project.author.avatarUrl!.isEmpty)
+                                  (project.author.avatarUrl == null ||
+                                          project.author.avatarUrl!.isEmpty)
                                       ? 'https://ui-avatars.com/api/?name=${project.author.name}&background=6366F1&color=fff'
                                       : project.author.avatarUrl!,
                                 ),
@@ -306,8 +308,8 @@ class ProjectCard extends ConsumerWidget {
                                   vertical: 2,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: AppColors.primary
-                                      .withValues(alpha: 0.15),
+                                  color:
+                                      AppColors.primary.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(6),
                                   border: Border.all(
                                     color: AppColors.primary

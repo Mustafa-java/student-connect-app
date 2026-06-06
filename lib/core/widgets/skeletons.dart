@@ -139,7 +139,7 @@ class StorySkeleton extends StatelessWidget {
             SizedBox(
               width: 50,
               height: 12,
-              child: const Placeholder(),
+              child: Placeholder(),
             ),
           ],
         ),
