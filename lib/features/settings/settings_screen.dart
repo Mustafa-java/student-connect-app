@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
 import '../../providers/app_providers.dart';
 import '../../providers/theme_provider.dart';
+import 'about_screen.dart';
 
 /// Экран настроек
 class SettingsScreen extends ConsumerWidget {
@@ -117,7 +118,14 @@ class SettingsScreen extends ConsumerWidget {
                 Icons.info_outline,
                 'О приложении',
                 subtitle: 'Версия 1.0.0',
-                onTap: () {},
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const AboutScreen(),
+                    ),
+                  );
+                },
               ),
             ],
           ),

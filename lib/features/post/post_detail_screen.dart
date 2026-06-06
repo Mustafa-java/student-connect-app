@@ -15,8 +15,8 @@ import '../profile/profile_screen.dart';
 import '../profile/other_user_profile_screen.dart';
 
 /// Провайдер комментариев для постов
-final postCommentsDetailProvider =
-    StateNotifierProvider.family<PostCommentsDetailNotifier, List<Comment>, String>(
+final postCommentsDetailProvider = StateNotifierProvider.family<
+    PostCommentsDetailNotifier, List<Comment>, String>(
   (ref, postId) {
     return PostCommentsDetailNotifier(postId);
   },
@@ -41,7 +41,8 @@ class PostCommentsDetailNotifier extends StateNotifier<List<Comment>> {
   Future<void> addComment(String content, User author) async {
     try {
       final comment = await ApiService.instance.addComment(
-        postId: postId, content: content,
+        postId: postId,
+        content: content,
       );
       state = [...state, comment];
     } catch (e) {
@@ -54,7 +55,8 @@ class PostCommentsDetailNotifier extends StateNotifier<List<Comment>> {
     final comment = comments[index];
     comments[index] = comment.copyWith(
       isLiked: !comment.isLiked,
-      likesCount: comment.isLiked ? comment.likesCount - 1 : comment.likesCount + 1,
+      likesCount:
+          comment.isLiked ? comment.likesCount - 1 : comment.likesCount + 1,
     );
     state = comments;
     // TODO: API для лайков комментариев пока нет
@@ -98,7 +100,9 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
     final currentUser = ref.read(currentUserProvider);
     if (currentUser == null) return;
 
-    ref.read(postCommentsDetailProvider(widget.post.id).notifier).addComment(text, currentUser);
+    ref
+        .read(postCommentsDetailProvider(widget.post.id).notifier)
+        .addComment(text, currentUser);
 
     _commentController.clear();
 
@@ -113,6 +117,13 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
     });
   }
 
+  Future<void> _refreshPost() async {
+    // Обновляем комментарии
+    await ref
+        .read(postCommentsDetailProvider(widget.post.id).notifier)
+        ._loadComments();
+  }
+
   void _navigateToProfile(User author) {
     final currentUser = ref.read(currentUserProvider);
     if (currentUser != null && author.id == currentUser.id) {
@@ -125,7 +136,8 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
       // Переход к чужому профилю
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => OtherUserProfileScreen(user: author)),
+        MaterialPageRoute(
+            builder: (context) => OtherUserProfileScreen(user: author)),
       );
     }
   }
@@ -175,9 +187,8 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
 
   void _shareInApp() {
     final content = widget.post.content ?? '';
-    final contentPreview = content.length > 100
-        ? '${content.substring(0, 100)}...'
-        : content;
+    final contentPreview =
+        content.length > 100 ? '${content.substring(0, 100)}...' : content;
 
     final shareText = '''
 📝 Пост от ${widget.post.author.name}
@@ -202,9 +213,8 @@ ${contentPreview.isNotEmpty ? contentPreview : 'Без текста'}
 
   void _shareExternal() {
     final content = widget.post.content ?? '';
-    final contentPreview = content.length > 100
-        ? '${content.substring(0, 100)}...'
-        : content;
+    final contentPreview =
+        content.length > 100 ? '${content.substring(0, 100)}...' : content;
 
     final shareText = '''
 Посмотри пост в Student Connect!
@@ -234,151 +244,155 @@ ${contentPreview.isNotEmpty ? '\n$contentPreview' : ''}
 
           // Контент
           Expanded(
-            child: CustomScrollView(
-              controller: _scrollController,
-              slivers: [
-                // Изображение (карусель)
-                if (images.isNotEmpty)
-                  SliverToBoxAdapter(child: _buildImagesCarousel(images)),
+            child: RefreshIndicator(
+              onRefresh: _refreshPost,
+              child: CustomScrollView(
+                controller: _scrollController,
+                slivers: [
+                  // Изображение (карусель)
+                  if (images.isNotEmpty)
+                    SliverToBoxAdapter(child: _buildImagesCarousel(images)),
 
-                // Действия (лайк, поделиться, сохранить) — БЕЗ кнопки коммента
-                SliverToBoxAdapter(child: _buildActionButtons(post)),
+                  // Действия (лайк, поделиться, сохранить) — БЕЗ кнопки коммента
+                  SliverToBoxAdapter(child: _buildActionButtons(post)),
 
-                // Лайки
-                if (post.likesCount + (_isLiked ? 1 : 0) > 0)
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: Text(
-                        'Нравится: ${author.name} и ещё ${post.likesCount + (_isLiked ? 1 : 0) - 1}',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
+                  // Лайки
+                  if (post.likesCount + (_isLiked ? 1 : 0) > 0)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Text(
+                          'Нравится: ${author.name} и ещё ${post.likesCount + (_isLiked ? 1 : 0) - 1}',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ),
-                  ),
 
-                // Описание
-                if (post.content != null && post.content!.isNotEmpty)
+                  // Описание
+                  if (post.content != null && post.content!.isNotEmpty)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 4),
+                        child: RichText(
+                          text: TextSpan(
+                            style: const TextStyle(
+                                fontSize: 14, color: AppColors.textDark),
+                            children: [
+                              TextSpan(
+                                text: '${author.name}  ',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w600),
+                              ),
+                              TextSpan(text: post.content),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+
+                  // Теги
+                  if (post.tags.isNotEmpty)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        child: Wrap(
+                          spacing: 6,
+                          children: post.tags
+                              .map((tag) => _buildChip('#$tag'))
+                              .toList(),
+                        ),
+                      ),
+                    ),
+
+                  // Время
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 4),
-                      child: RichText(
-                        text: TextSpan(
-                          style: const TextStyle(
-                              fontSize: 14, color: AppColors.textDark),
-                          children: [
-                            TextSpan(
-                              text: '${author.name}  ',
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.w600),
-                            ),
-                            TextSpan(text: post.content),
-                          ],
+                      child: Text(
+                        _getTimeAgo(post.createdAt).toUpperCase(),
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: AppColors.textDarkSecondary,
+                          letterSpacing: 0.5,
                         ),
                       ),
                     ),
                   ),
 
-                // Теги
-                if (post.tags.isNotEmpty)
+                  // Разделитель
+                  const SliverToBoxAdapter(
+                    child: Divider(height: 1),
+                  ),
+
+                  // Комментарии
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
-                      child: Wrap(
-                        spacing: 6,
-                        children: post.tags
-                            .map((tag) => _buildChip('#$tag'))
-                            .toList(),
-                      ),
-                    ),
-                  ),
-
-                // Время
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                    child: Text(
-                      _getTimeAgo(post.createdAt).toUpperCase(),
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: AppColors.textDarkSecondary,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ),
-                ),
-
-                // Разделитель
-                const SliverToBoxAdapter(
-                  child: Divider(height: 1),
-                ),
-
-                // Комментарии
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Комментарии (${comments.length})',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textDark,
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Комментарии (${comments.length})',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textDark,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 12),
-                        if (comments.isEmpty)
-                          Center(
-                            child: Column(
-                              children: [
-                                Icon(
-                                  Icons.chat_bubble_outline,
-                                  size: 48,
-                                  color: AppColors.textDarkSecondary,
-                                ),
-                                const SizedBox(height: 12),
-                                Text(
-                                  'Пока нет комментариев',
-                                  style: TextStyle(
-                                    fontSize: 14,
+                          const SizedBox(height: 12),
+                          if (comments.isEmpty)
+                            Center(
+                              child: Column(
+                                children: [
+                                  Icon(
+                                    Icons.chat_bubble_outline,
+                                    size: 48,
                                     color: AppColors.textDarkSecondary,
                                   ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Будьте первым!',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.textDarkSecondary
-                                        .withValues(alpha: 0.7),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    'Пока нет комментариев',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: AppColors.textDarkSecondary,
+                                    ),
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Будьте первым!',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.textDarkSecondary
+                                          .withValues(alpha: 0.7),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          else
+                            ListView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: comments.length,
+                              itemBuilder: (context, index) {
+                                return _buildCommentItem(
+                                    comments[index], index);
+                              },
                             ),
-                          )
-                        else
-                          ListView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: comments.length,
-                            itemBuilder: (context, index) {
-                              return _buildCommentItem(comments[index], index);
-                            },
-                          ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ),
 
-                const SliverToBoxAdapter(child: SizedBox(height: 80)),
-              ],
+                  const SliverToBoxAdapter(child: SizedBox(height: 80)),
+                ],
+              ),
             ),
           ),
 
@@ -391,7 +405,8 @@ ${contentPreview.isNotEmpty ? '\n$contentPreview' : ''}
 
   Widget _buildCommentItem(Comment comment, int index) {
     final currentUser = ref.read(currentUserProvider);
-    final isOwnComment = currentUser != null && comment.author.id == currentUser.id;
+    final isOwnComment =
+        currentUser != null && comment.author.id == currentUser.id;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -463,7 +478,8 @@ ${contentPreview.isNotEmpty ? '\n$contentPreview' : ''}
                     GestureDetector(
                       onTap: () {
                         ref
-                            .read(postCommentsDetailProvider(widget.post.id).notifier)
+                            .read(postCommentsDetailProvider(widget.post.id)
+                                .notifier)
                             .toggleLike(index);
                       },
                       child: Row(
@@ -500,7 +516,8 @@ ${contentPreview.isNotEmpty ? '\n$contentPreview' : ''}
                       GestureDetector(
                         onTap: () {
                           ref
-                              .read(postCommentsDetailProvider(widget.post.id).notifier)
+                              .read(postCommentsDetailProvider(widget.post.id)
+                                  .notifier)
                               .deleteComment(index);
                         },
                         child: Icon(
@@ -615,7 +632,10 @@ ${contentPreview.isNotEmpty ? '\n$contentPreview' : ''}
           children: [
             GestureDetector(
               onTap: () => _navigateToProfile(author),
-              child: CustomAvatar(radius: 16, imageUrl: author.avatarUrl, hasStoryGradient: true),
+              child: CustomAvatar(
+                  radius: 16,
+                  imageUrl: author.avatarUrl,
+                  hasStoryGradient: true),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -731,7 +751,8 @@ ${contentPreview.isNotEmpty ? '\n$contentPreview' : ''}
           const SizedBox(width: 16),
           GestureDetector(
             onTap: _sharePost,
-            child: Icon(Icons.send_outlined, size: 26, color: AppColors.textDark),
+            child:
+                Icon(Icons.send_outlined, size: 26, color: AppColors.textDark),
           ),
           const Spacer(),
           GestureDetector(
@@ -775,8 +796,18 @@ ${contentPreview.isNotEmpty ? '\n$contentPreview' : ''}
 
   String _monthName(int m) {
     const months = [
-      'янв', 'фев', 'мар', 'апр', 'мая', 'июн',
-      'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'
+      'янв',
+      'фев',
+      'мар',
+      'апр',
+      'мая',
+      'июн',
+      'июл',
+      'авг',
+      'сен',
+      'окт',
+      'ноя',
+      'дек'
     ];
     return months[m - 1];
   }

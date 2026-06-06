@@ -36,6 +36,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
   int _currentImageIndex = 0;
   bool _isLiked = false;
   bool _isSaved = false;
+  bool _showHeartAnimation = false;
   final CarouselSliderController _carouselController =
       CarouselSliderController();
   final ScrollController _scrollController = ScrollController();
@@ -136,10 +137,10 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
     if (confirm == true && mounted) {
       final success = await ApiService.instance.deleteProject(_project.id);
-      
+
       if (success && mounted) {
         Navigator.of(context).pop(); // Возвращаемся назад
-        
+
         // Показываем сообщение
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -148,7 +149,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
             behavior: SnackBarBehavior.floating,
           ),
         );
-        
+
         // Обновляем список проектов
         final ref = ProviderScope.containerOf(context, listen: false);
         ref.invalidate(projectsStreamProvider);
@@ -172,7 +173,9 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     if (currentUser == null) return;
 
     // Добавляем комментарий через API
-    ref.read(projectCommentsProvider(widget.project.id).notifier).addComment(text);
+    ref
+        .read(projectCommentsProvider(widget.project.id).notifier)
+        .addComment(text);
 
     _commentController.clear();
 
@@ -188,6 +191,55 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     });
   }
 
+  Future<void> _refreshProject() async {
+    // Обновляем комментарии
+    await ref
+        .read(projectCommentsProvider(widget.project.id).notifier)
+        .refresh();
+  }
+
+  void _handleDoubleTap() {
+    if (!_isLiked) {
+      _toggleLike();
+    }
+    setState(() {
+      _showHeartAnimation = true;
+    });
+    Future.delayed(const Duration(milliseconds: 800), () {
+      if (mounted) {
+        setState(() {
+          _showHeartAnimation = false;
+        });
+      }
+    });
+  }
+
+  Future<void> _toggleLike() async {
+    setState(() {
+      _isLiked = !_isLiked;
+      _project = _project.copyWith(
+        likesCount:
+            _isLiked ? _project.likesCount + 1 : _project.likesCount - 1,
+      );
+    });
+
+    try {
+      await ApiService.instance.toggleProjectLike(_project.id);
+    } catch (e) {
+      debugPrint('Toggle project like error: $e');
+      // Откатываем изменения при ошибке
+      if (mounted) {
+        setState(() {
+          _isLiked = !_isLiked;
+          _project = _project.copyWith(
+            likesCount:
+                _isLiked ? _project.likesCount + 1 : _project.likesCount - 1,
+          );
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final project = _project;
@@ -197,69 +249,70 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.backgroundDark,
-      body: CustomScrollView(
-        slivers: [
-          // Sliver AppBar с изображением
-          _buildSliverAppBar(images),
+      body: RefreshIndicator(
+        onRefresh: _refreshProject,
+        child: CustomScrollView(
+          slivers: [
+            // Sliver AppBar с изображением
+            _buildSliverAppBar(images),
 
-          // Контент
-          SliverToBoxAdapter(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Заголовок с информацией о проекте
-                _buildProjectHeader(author, project),
+            // Контент
+            SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Заголовок с информацией о проекте
+                  _buildProjectHeader(author, project),
 
-                const SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
-                // Кнопки действий
-                _buildActionButtons(project),
+                  // Кнопки действий
+                  _buildActionButtons(project),
 
-                const SizedBox(height: 20),
+                  const SizedBox(height: 20),
 
-                // Описание проекта
-                if (project.description.isNotEmpty)
-                  _buildDescriptionSection(project.description),
+                  // Описание проекта
+                  if (project.description.isNotEmpty)
+                    _buildDescriptionSection(project.description),
 
-                const SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
-                // Технологии/навыки
-                if (project.skills.isNotEmpty)
-                  _buildSkillsSection(project.skills),
+                  // Технологии/навыки
+                  if (project.skills.isNotEmpty)
+                    _buildSkillsSection(project.skills),
 
-                const SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
-                // Университеты
-                if (project.universityTags.isNotEmpty)
-                  _buildUniversitySection(project.universityTags),
+                  // Университеты
+                  if (project.universityTags.isNotEmpty)
+                    _buildUniversitySection(project.universityTags),
 
-                const SizedBox(height: 20),
+                  const SizedBox(height: 20),
 
-                // Кнопка скачивания ZIP файла
-                if (_project.hasZipFile)
-                  _buildDownloadButton(),
+                  // Кнопка скачивания ZIP файла
+                  if (_project.hasZipFile) _buildDownloadButton(),
 
-                const SizedBox(height: 20),
+                  const SizedBox(height: 20),
 
-                // Команда проекта
-                if (project.teamMembers.isNotEmpty)
-                  _buildTeamSection(),
+                  // Команда проекта
+                  if (project.teamMembers.isNotEmpty) _buildTeamSection(),
 
-                const SizedBox(height: 24),
+                  const SizedBox(height: 24),
 
-                // Разделитель
-                const Divider(height: 1),
+                  // Разделитель
+                  const Divider(height: 1),
 
-                const SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
-                // Комментарии
-                _buildCommentsSection(comments),
+                  // Комментарии
+                  _buildCommentsSection(comments),
 
-                const SizedBox(height: 100), // Отступ для поля ввода
-              ],
+                  const SizedBox(height: 100), // Отступ для поля ввода
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
 
       // Поле ввода комментария (fixed внизу)
@@ -376,12 +429,15 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
               const Spacer(),
               // Бейдж статуса
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: _getStatusColor(project.status).withValues(alpha: 0.15),
+                  color:
+                      _getStatusColor(project.status).withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: _getStatusColor(project.status).withValues(alpha: 0.3),
+                    color:
+                        _getStatusColor(project.status).withValues(alpha: 0.3),
                     width: 1,
                   ),
                 ),
@@ -415,11 +471,16 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           // Статистика
           Row(
             children: [
-              _buildStatItem(Icons.favorite_rounded, project.likesCount.toString(), AppColors.error),
+              _buildStatItem(Icons.favorite_rounded,
+                  project.likesCount.toString(), AppColors.error),
               const SizedBox(width: 16),
-              _buildStatItem(Icons.chat_bubble_rounded, project.commentsCount.toString(), AppColors.textDarkSecondary),
+              _buildStatItem(
+                  Icons.chat_bubble_rounded,
+                  project.commentsCount.toString(),
+                  AppColors.textDarkSecondary),
               const SizedBox(width: 16),
-              _buildStatItem(Icons.visibility_rounded, project.viewsCount.toString(), AppColors.textDarkSecondary),
+              _buildStatItem(Icons.visibility_rounded,
+                  project.viewsCount.toString(), AppColors.textDarkSecondary),
               const Spacer(),
               Text(
                 _getTimeAgo(project.createdAt),
@@ -470,7 +531,8 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
   Widget _buildCommentItem(Comment comment, int index) {
     final currentUser = ref.read(currentUserProvider);
-    final isOwnComment = currentUser != null && comment.author.id == currentUser.id;
+    final isOwnComment =
+        currentUser != null && comment.author.id == currentUser.id;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -542,7 +604,8 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                     GestureDetector(
                       onTap: () {
                         ref
-                            .read(projectCommentsProvider(widget.project.id).notifier)
+                            .read(projectCommentsProvider(widget.project.id)
+                                .notifier)
                             .toggleLike(index);
                       },
                       child: Row(
@@ -588,11 +651,13 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                               ),
                               content: const Text(
                                 'Комментарий будет удалён безвозвратно.',
-                                style: TextStyle(color: AppColors.textDarkSecondary),
+                                style: TextStyle(
+                                    color: AppColors.textDarkSecondary),
                               ),
                               actions: [
                                 TextButton(
-                                  onPressed: () => Navigator.pop(context, false),
+                                  onPressed: () =>
+                                      Navigator.pop(context, false),
                                   child: const Text('Отмена'),
                                 ),
                                 ElevatedButton(
@@ -608,7 +673,8 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
                           if (confirm == true) {
                             ref
-                                .read(projectCommentsProvider(widget.project.id).notifier)
+                                .read(projectCommentsProvider(widget.project.id)
+                                    .notifier)
                                 .deleteComment(index);
                           }
                         },
@@ -832,57 +898,84 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
   Widget _buildImagesCarousel(List<String> images) {
     return Stack(
       children: [
-        CarouselSlider(
-          options: CarouselOptions(
-            height: 400,
-            viewportFraction: 1.0,
-            onPageChanged: (index, reason) {
-              setState(() => _currentImageIndex = index);
-            },
-          ),
-          carouselController: _carouselController,
-          items: images.map((imageUrl) {
-            final isLocalFile =
-                imageUrl.startsWith('/') || imageUrl.startsWith('file://');
-            return GestureDetector(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => ImageViewerScreen(
-                      imageUrls: images,
-                      initialIndex: _currentImageIndex,
-                    ),
-                  ),
-                );
+        GestureDetector(
+          onDoubleTap: _handleDoubleTap,
+          child: CarouselSlider(
+            options: CarouselOptions(
+              height: 400,
+              viewportFraction: 1.0,
+              onPageChanged: (index, reason) {
+                setState(() => _currentImageIndex = index);
               },
-              child: Container(
-                color: AppColors.backgroundDark,
-                child: isLocalFile
-                    ? Image.file(
-                        File(imageUrl.startsWith('file://')
-                            ? imageUrl.replaceFirst('file://', '')
-                            : imageUrl),
-                        fit: BoxFit.cover,
-                        width: double.infinity,
-                        errorBuilder: (context, error, stackTrace) {
-                          return const Center(
-                            child: Icon(
-                              Icons.image_not_supported_outlined,
-                              size: 50,
-                            ),
-                          );
-                        },
-                      )
-                    : SmartImage(
-                        imageUrl: imageUrl,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
+            ),
+            carouselController: _carouselController,
+            items: images.map((imageUrl) {
+              final isLocalFile =
+                  imageUrl.startsWith('/') || imageUrl.startsWith('file://');
+              return GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ImageViewerScreen(
+                        imageUrls: images,
+                        initialIndex: _currentImageIndex,
                       ),
-              ),
-            );
-          }).toList(),
+                    ),
+                  );
+                },
+                child: Container(
+                  color: AppColors.backgroundDark,
+                  child: isLocalFile
+                      ? Image.file(
+                          File(imageUrl.startsWith('file://')
+                              ? imageUrl.replaceFirst('file://', '')
+                              : imageUrl),
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                          errorBuilder: (context, error, stackTrace) {
+                            return const Center(
+                              child: Icon(
+                                Icons.image_not_supported_outlined,
+                                size: 50,
+                              ),
+                            );
+                          },
+                        )
+                      : SmartImage(
+                          imageUrl: imageUrl,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                        ),
+                ),
+              );
+            }).toList(),
+          ),
         ),
+        // Анимация сердца при double-tap
+        if (_showHeartAnimation)
+          Center(
+            child: Icon(
+              Icons.favorite,
+              size: 80,
+              color: Colors.white,
+            )
+                .animate(
+                  onPlay: (controller) => controller.repeat(),
+                )
+                .scale(
+                  begin: const Offset(0, 0),
+                  end: const Offset(1.5, 1.5),
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeOut,
+                )
+                .then()
+                .fade(
+                  begin: 1,
+                  end: 0,
+                  duration: const Duration(milliseconds: 400),
+                ),
+          ),
         // Индикатор страниц
         if (images.length > 1)
           Positioned(
@@ -917,7 +1010,8 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
               final wasLiked = _isLiked;
               setState(() => _isLiked = !_isLiked);
               try {
-                final result = await ApiService.instance.toggleProjectLike(_project.id);
+                final result =
+                    await ApiService.instance.toggleProjectLike(_project.id);
                 if (mounted) {
                   setState(() {
                     _isLiked = result['is_liked'] as bool;
@@ -946,7 +1040,8 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           const SizedBox(width: 16),
           GestureDetector(
             onTap: _shareProject,
-            child: Icon(Icons.send_outlined, size: 26, color: AppColors.textDark),
+            child:
+                Icon(Icons.send_outlined, size: 26, color: AppColors.textDark),
           ),
           const Spacer(),
           GestureDetector(
@@ -1093,7 +1188,8 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
             runSpacing: 8,
             children: skills.map((skill) {
               return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
@@ -1154,7 +1250,8 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
             runSpacing: 8,
             children: universities.map((uni) {
               return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: AppColors.surfaceDarkLight,
                   borderRadius: BorderRadius.circular(10),
@@ -1378,7 +1475,8 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
   void _showOptionsMenu() {
     // Получаем currentUser напрямую из ref
     final currentUser = ref.read(currentUserProvider);
-    final isMyProject = currentUser != null && widget.project.author.id == currentUser.id;
+    final isMyProject =
+        currentUser != null && widget.project.author.id == currentUser.id;
 
     showModalBottomSheet(
       context: context,
@@ -1401,7 +1499,8 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
             ),
             if (isMyProject)
               ListTile(
-                leading: const Icon(Icons.delete_outline, color: AppColors.error),
+                leading:
+                    const Icon(Icons.delete_outline, color: AppColors.error),
                 title: const Text(
                   'Удалить проект',
                   style: TextStyle(color: AppColors.error),
@@ -1565,8 +1664,18 @@ $descriptionPreview
 
   String _monthName(int m) {
     const months = [
-      'янв', 'фев', 'мар', 'апр', 'мая', 'июн',
-      'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'
+      'янв',
+      'фев',
+      'мар',
+      'апр',
+      'мая',
+      'июн',
+      'июл',
+      'авг',
+      'сен',
+      'окт',
+      'ноя',
+      'дек'
     ];
     return months[m - 1];
   }
@@ -1588,7 +1697,8 @@ $descriptionPreview
 
     try {
       // Создаём или получаем существующий чат
-      final chatId = await ApiService.instance.createChat(widget.project.author.id);
+      final chatId =
+          await ApiService.instance.createChat(widget.project.author.id);
       final chats = await ApiService.instance.getChats();
       final chatData = chats.firstWhere(
         (c) => c['id'] == chatId,

@@ -14,6 +14,7 @@ import '../project/project_detail_screen.dart';
 import '../post/post_detail_screen.dart';
 import '../settings/settings_screen.dart';
 import 'edit_profile_screen.dart';
+import 'followers_screen.dart';
 
 /// Экран профиля — стиль Instagram 2025
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -162,10 +163,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                             children: [
                               _buildStatItem(
-                                  '${user.projectsCount}', 'Проекты'),
-                              _buildStatItem('${user.followersCount}', 'Подп.'),
+                                  '${user.projectsCount}', 'Проекты', onTap: null),
+                              _buildStatItem('${user.followersCount}', 'Подп.',
+                                onTap: () => _openFollowersScreen(user, showFollowers: true)),
                               _buildStatItem(
-                                  '${user.followingCount}', 'Подписки'),
+                                  '${user.followingCount}', 'Подписки',
+                                  onTap: () => _openFollowersScreen(user, showFollowers: false)),
                             ],
                           ),
                         ),
@@ -595,8 +598,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     );
   }
 
-  Widget _buildStatItem(String value, String label) {
-    return Column(
+  Widget _buildStatItem(String value, String label, {VoidCallback? onTap}) {
+    final widget = Column(
       children: [
         Text(
           value,
@@ -614,6 +617,27 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
           ),
         ),
       ],
+    );
+
+    if (onTap != null) {
+      return GestureDetector(
+        onTap: onTap,
+        child: widget,
+      );
+    }
+    return widget;
+  }
+
+  void _openFollowersScreen(User user, {required bool showFollowers}) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => FollowersScreen(
+          userId: user.id,
+          userName: user.name,
+          showFollowers: showFollowers,
+        ),
+      ),
     );
   }
 

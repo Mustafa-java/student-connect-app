@@ -432,15 +432,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       return;
     }
 
+    debugPrint('Opening shared content: type=${message.type}, id=${message.projectId}');
+
     try {
       if (message.type == MessageType.post) {
         // Загрузка поста по ID
+        debugPrint('Loading posts...');
         final posts = await ApiService.instance.getPosts();
+        debugPrint('Loaded ${posts.length} posts, searching for ${message.projectId}');
+
         final post = posts.firstWhere(
-          (p) => p.id == message.projectId,
-          orElse: () => throw Exception('Пост не найден'),
+          (p) {
+            debugPrint('Checking post: id=${p.id}');
+            return p.id == message.projectId;
+          },
+          orElse: () => throw Exception('Пост не найден (ID: ${message.projectId})'),
         );
 
+        debugPrint('Post found: ${post.id}');
         if (mounted) {
           Navigator.push(
             context,
@@ -451,7 +460,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         }
       } else if (message.type == MessageType.project) {
         // Загрузка проекта по ID
+        debugPrint('Loading projects...');
         final projects = await ApiService.instance.getProjects();
+        debugPrint('Loaded ${projects.length} projects, searching for ${message.projectId}');
+
         final project = projects.firstWhere(
           (p) => p.id == message.projectId,
           orElse: () => throw Exception('Проект не найден'),
@@ -467,6 +479,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         }
       }
     } catch (e) {
+      debugPrint('Error opening shared content: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

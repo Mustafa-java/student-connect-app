@@ -1,15 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/custom_avatar.dart';
+import '../../models/models.dart';
+import '../../providers/app_providers.dart';
+import '../profile/other_user_profile_screen.dart';
+import '../post/post_detail_screen.dart';
+import '../project/project_detail_screen.dart';
 
 /// Экран уведомлений
-class NotificationsScreen extends StatelessWidget {
+class NotificationsScreen extends ConsumerWidget {
   const NotificationsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final notifications = _mockNotifications;
+  Widget build(BuildContext context, WidgetRef ref) {
+    // В будущем здесь будет реальный API
+    // Пока используем моковые данные для демонстрации
+    final notifications = _getMockNotifications();
 
     return Scaffold(
       backgroundColor: AppColors.backgroundDark,
@@ -37,7 +45,7 @@ class NotificationsScreen extends StatelessWidget {
                 delegate: SliverChildBuilderDelegate(
                   (context, index) {
                     final notification = notifications[index];
-                    return _buildNotificationTile(notification, index);
+                    return _buildNotificationTile(context, ref, notification, index);
                   },
                   childCount: notifications.length,
                 ),
@@ -81,7 +89,12 @@ class NotificationsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildNotificationTile(_Notification notification, int index) {
+  Widget _buildNotificationTile(
+    BuildContext context,
+    WidgetRef ref,
+    _Notification notification,
+    int index,
+  ) {
     return ListTile(
       leading: CustomAvatar(
         radius: 24,
@@ -117,7 +130,7 @@ class NotificationsScreen extends StatelessWidget {
               color: notification.iconColor,
             )
           : null,
-      onTap: () {},
+      onTap: () => _handleNotificationTap(context, ref, notification),
     )
         .animate()
         .fadeIn(
@@ -126,6 +139,75 @@ class NotificationsScreen extends StatelessWidget {
         )
         .slideX(begin: 0.1, end: 0);
   }
+
+  void _handleNotificationTap(
+    BuildContext context,
+    WidgetRef ref,
+    _Notification notification,
+  ) {
+    switch (notification.type) {
+      case NotificationType.like:
+      case NotificationType.comment:
+        // Переход к посту (если есть данные поста)
+        if (notification.relatedPost != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => PostDetailScreen(post: notification.relatedPost!),
+            ),
+          );
+        }
+        break;
+
+      case NotificationType.follow:
+        // Переход к профилю пользователя
+        if (notification.relatedUser != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => OtherUserProfileScreen(user: notification.relatedUser!),
+            ),
+          );
+        }
+        break;
+
+      case NotificationType.projectLike:
+        // Переход к проекту
+        if (notification.relatedProject != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ProjectDetailScreen(project: notification.relatedProject!),
+            ),
+          );
+        }
+        break;
+
+      default:
+        // Для остальных типов показываем уведомление
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Функция в разработке'),
+            duration: Duration(seconds: 1),
+          ),
+        );
+    }
+  }
+
+  List<_Notification> _getMockNotifications() {
+    // В реальном приложении здесь будет API вызов
+    // Пока возвращаем пустой список, чтобы показать пустое состояние
+    // Можно добавить моковые данные для демонстрации
+    return [];
+  }
+}
+
+enum NotificationType {
+  like,
+  comment,
+  follow,
+  projectLike,
+  message,
 }
 
 class _Notification {
@@ -135,15 +217,21 @@ class _Notification {
   final String timeAgo;
   final IconData? icon;
   final Color? iconColor;
+  final NotificationType type;
+  final Post? relatedPost;
+  final User? relatedUser;
+  final Project? relatedProject;
 
   const _Notification({
     required this.userName,
     required this.avatarUrl,
     required this.message,
     required this.timeAgo,
+    required this.type,
     this.icon,
     this.iconColor,
+    this.relatedPost,
+    this.relatedUser,
+    this.relatedProject,
   });
 }
-
-final _mockNotifications = <_Notification>[];

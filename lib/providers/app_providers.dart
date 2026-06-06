@@ -62,9 +62,15 @@ class AuthNotifier extends StateNotifier<AuthStatus> {
     state = AuthStatus.loading;
     try {
       await ApiService.instance.register(
-        name: name, email: email, password: password,
-        university: university, faculty: faculty, course: course,
-        bio: bio, skills: skills, avatarUrl: avatarUrl,
+        name: name,
+        email: email,
+        password: password,
+        university: university,
+        faculty: faculty,
+        course: course,
+        bio: bio,
+        skills: skills,
+        avatarUrl: avatarUrl,
       );
       state = AuthStatus.authenticated;
       return true;
@@ -181,20 +187,27 @@ final followingPostsStreamProvider = StreamProvider<List<Post>>((ref) {
       // Получаем список подписок
       final following = await ApiService.instance.getFollowing(currentUser.id);
       final followingIds = following.map((u) => u.id).toSet();
-      debugPrint('followingPostsStreamProvider: following ${followingIds.length} users');
+      debugPrint(
+          'followingPostsStreamProvider: following ${followingIds.length} users');
 
       // Получаем все посты
       final posts = await ApiService.instance.getPosts();
-      debugPrint('followingPostsStreamProvider: received ${posts.length} total posts');
-      
+      debugPrint(
+          'followingPostsStreamProvider: received ${posts.length} total posts');
+
       // Фильтруем только от подписок + свои посты
-      final filteredPosts = posts.where((p) => 
-        followingIds.contains(p.author.id) || p.author.id == currentUser.id).toList();
-      
-      debugPrint('followingPostsStreamProvider: filtered ${filteredPosts.length} posts');
+      final filteredPosts = posts
+          .where((p) =>
+              followingIds.contains(p.author.id) ||
+              p.author.id == currentUser.id)
+          .toList();
+
+      debugPrint(
+          'followingPostsStreamProvider: filtered ${filteredPosts.length} posts');
 
       if (!controller.isClosed) {
-        controller.add(filteredPosts.isEmpty ? _safeMockPosts() : filteredPosts);
+        controller
+            .add(filteredPosts.isEmpty ? _safeMockPosts() : filteredPosts);
       }
     } catch (e) {
       debugPrint('followingPostsStreamProvider error: $e');
@@ -232,7 +245,8 @@ final postLikesProvider =
 class PostLikesState {
   final bool isLikedByCurrentUser;
   final int totalLikes;
-  const PostLikesState({required this.isLikedByCurrentUser, required this.totalLikes});
+  const PostLikesState(
+      {required this.isLikedByCurrentUser, required this.totalLikes});
   PostLikesState copyWith({bool? isLikedByCurrentUser, int? totalLikes}) {
     return PostLikesState(
       isLikedByCurrentUser: isLikedByCurrentUser ?? this.isLikedByCurrentUser,
@@ -259,7 +273,8 @@ class PostLikesNotifier extends StateNotifier<PostLikesState> {
         totalLikes: result['likes_count'] as int,
       );
     } catch (e) {
-      state = PostLikesState(isLikedByCurrentUser: wasLiked, totalLikes: state.totalLikes);
+      state = PostLikesState(
+          isLikedByCurrentUser: wasLiked, totalLikes: state.totalLikes);
     }
   }
 }
@@ -272,9 +287,11 @@ final projectsStreamProvider = StreamProvider<List<Project>>((ref) {
   Future<void> fetch() async {
     try {
       final projects = await ApiService.instance.getProjects();
-      debugPrint('projectsStreamProvider: received ${projects.length} projects');
+      debugPrint(
+          'projectsStreamProvider: received ${projects.length} projects');
       for (var p in projects) {
-        debugPrint('  - Project: ${p.title}, author: ${p.author.name}, university: ${p.author.university}');
+        debugPrint(
+            '  - Project: ${p.title}, author: ${p.author.name}, university: ${p.author.university}');
       }
       if (!controller.isClosed) {
         controller.add(projects.isEmpty ? MockProjects.projects : projects);
@@ -310,7 +327,8 @@ final chatsStreamProvider = StreamProvider<List<Chat>>((ref) {
       final chatDataList = await ApiService.instance.getChats();
       debugPrint('chatsStreamProvider: received ${chatDataList.length} chats');
       final chats = chatDataList.map((data) {
-        debugPrint('Parsing chat: ${data['id']}, last_message_at type: ${data['last_message_at'].runtimeType}');
+        debugPrint(
+            'Parsing chat: ${data['id']}, last_message_at type: ${data['last_message_at'].runtimeType}');
         return _parseChat(data);
       }).toList();
       if (!controller.isClosed) controller.add(chats);
@@ -334,20 +352,36 @@ final chatsProvider = StateProvider<List<Chat>>((ref) {
 
 Chat _parseChat(Map<String, dynamic> data) {
   final otherUser = data['other_user'] as Map<String, dynamic>?;
-  final user = otherUser != null ? _parseUserFromMap(otherUser)
-      : User(id: '', name: 'Неизвестный', email: '', createdAt: DateTime.now(), skills: [], projectsCount: 0, followersCount: 0, followingCount: 0);
+  final user = otherUser != null
+      ? _parseUserFromMap(otherUser)
+      : User(
+          id: '',
+          name: 'Неизвестный',
+          email: '',
+          createdAt: DateTime.now(),
+          skills: [],
+          projectsCount: 0,
+          followersCount: 0,
+          followingCount: 0);
 
   final lastMsgData = data['last_message'] as Map<String, dynamic>?;
   Message? lastMessage;
   if (lastMsgData != null) {
     final sender = lastMsgData['sender'] as Map<String, dynamic>?;
-    final senderUser = sender != null ? User(
-      id: sender['id'] ?? '', name: sender['name'] ?? '',
-      email: sender['email'] ?? '', avatarUrl: sender['avatar_url'],
-      isOnline: _toBool(sender['is_online']),
-      createdAt: DateTime.now(), skills: [],
-      projectsCount: 0, followersCount: 0, followingCount: 0,
-    ) : user;
+    final senderUser = sender != null
+        ? User(
+            id: sender['id'] ?? '',
+            name: sender['name'] ?? '',
+            email: sender['email'] ?? '',
+            avatarUrl: sender['avatar_url'],
+            isOnline: _toBool(sender['is_online']),
+            createdAt: DateTime.now(),
+            skills: [],
+            projectsCount: 0,
+            followersCount: 0,
+            followingCount: 0,
+          )
+        : user;
 
     lastMessage = Message(
       id: lastMsgData['id'] ?? '',
@@ -373,7 +407,8 @@ Chat _parseChat(Map<String, dynamic> data) {
 
 /// Универсальный парсер timestamp (поддерживает int, String, null)
 DateTime _parseTimestamp(dynamic value) {
-  debugPrint('_parseTimestamp called with value: $value (type: ${value.runtimeType})');
+  debugPrint(
+      '_parseTimestamp called with value: $value (type: ${value.runtimeType})');
   if (value == null) return DateTime.now();
   if (value is int) return DateTime.fromMillisecondsSinceEpoch(value);
   if (value is String) {
@@ -414,7 +449,8 @@ final messagesStreamProvider =
   Future<void> fetch() async {
     try {
       final msgDataList = await ApiService.instance.getMessages(chatId);
-      final messages = msgDataList.map((data) => _parseMessage(data, chatId)).toList();
+      final messages =
+          msgDataList.map((data) => _parseMessage(data, chatId)).toList();
       if (!controller.isClosed) controller.add(messages);
     } catch (e) {
       debugPrint('messagesStreamProvider error: $e');
@@ -436,23 +472,31 @@ final messagesProvider =
 
 Message _parseMessage(Map<String, dynamic> data, String chatId) {
   final sender = data['sender'] as Map<String, dynamic>?;
-  final senderUser = sender != null ? User(
-    id: sender['id'] ?? '',
-    name: sender['name'] ?? 'Пользователь',
-    email: sender['email'] ?? '',
-    avatarUrl: sender['avatar_url'],
-    isOnline: _toBool(sender['is_online']),
-    createdAt: DateTime.now(), skills: [],
-    projectsCount: 0, followersCount: 0, followingCount: 0,
-  ) : User(
-    id: data['sender_id'] ?? '',
-    name: data['sender_name'] ?? 'Пользователь',
-    email: data['sender_email'] ?? '',
-    avatarUrl: data['sender_avatar'],
-    isOnline: _toBool(data['sender_is_online']),
-    createdAt: DateTime.now(), skills: [],
-    projectsCount: 0, followersCount: 0, followingCount: 0,
-  );
+  final senderUser = sender != null
+      ? User(
+          id: sender['id'] ?? '',
+          name: sender['name'] ?? 'Пользователь',
+          email: sender['email'] ?? '',
+          avatarUrl: sender['avatar_url'],
+          isOnline: _toBool(sender['is_online']),
+          createdAt: DateTime.now(),
+          skills: [],
+          projectsCount: 0,
+          followersCount: 0,
+          followingCount: 0,
+        )
+      : User(
+          id: data['sender_id'] ?? '',
+          name: data['sender_name'] ?? 'Пользователь',
+          email: data['sender_email'] ?? '',
+          avatarUrl: data['sender_avatar'],
+          isOnline: _toBool(data['sender_is_online']),
+          createdAt: DateTime.now(),
+          skills: [],
+          projectsCount: 0,
+          followersCount: 0,
+          followingCount: 0,
+        );
 
   // is_read может быть bool или int (из SQLite)
   final isReadRaw = data['is_read'];
@@ -517,7 +561,8 @@ class PostCommentsNotifier extends StateNotifier<List<Comment>> {
   Future<void> addComment(String content) async {
     try {
       final comment = await ApiService.instance.addComment(
-        postId: postId, content: content,
+        postId: postId,
+        content: content,
       );
       state = [...state, comment];
     } catch (e) {
@@ -530,9 +575,12 @@ class PostCommentsNotifier extends StateNotifier<List<Comment>> {
     final comments = List<Comment>.from(state);
     final c = comments[index];
     comments[index] = Comment(
-      id: c.id, author: c.author, content: c.content,
+      id: c.id,
+      author: c.author,
+      content: c.content,
       likesCount: c.isLiked ? c.likesCount - 1 : c.likesCount + 1,
-      isLiked: !c.isLiked, createdAt: c.createdAt,
+      isLiked: !c.isLiked,
+      createdAt: c.createdAt,
     );
     state = comments;
   }
@@ -544,8 +592,8 @@ class PostCommentsNotifier extends StateNotifier<List<Comment>> {
 
 // ==================== PROJECT COMMENTS ====================
 
-final projectCommentsProvider =
-    StateNotifierProvider.family<ProjectCommentsNotifier, List<Comment>, String>(
+final projectCommentsProvider = StateNotifierProvider.family<
+    ProjectCommentsNotifier, List<Comment>, String>(
   (ref, projectId) => ProjectCommentsNotifier(projectId),
 );
 
@@ -567,7 +615,8 @@ class ProjectCommentsNotifier extends StateNotifier<List<Comment>> {
   Future<void> addComment(String content) async {
     try {
       final comment = await ApiService.instance.addProjectComment(
-        projectId: projectId, content: content,
+        projectId: projectId,
+        content: content,
       );
       state = [...state, comment];
     } catch (e) {
@@ -575,14 +624,21 @@ class ProjectCommentsNotifier extends StateNotifier<List<Comment>> {
     }
   }
 
+  Future<void> refresh() async {
+    await _loadComments();
+  }
+
   void toggleLike(int index) {
     // TODO: Implement comment likes via API
     final comments = List<Comment>.from(state);
     final c = comments[index];
     comments[index] = Comment(
-      id: c.id, author: c.author, content: c.content,
+      id: c.id,
+      author: c.author,
+      content: c.content,
       likesCount: c.isLiked ? c.likesCount - 1 : c.likesCount + 1,
-      isLiked: !c.isLiked, createdAt: c.createdAt,
+      isLiked: !c.isLiked,
+      createdAt: c.createdAt,
     );
     state = comments;
   }
@@ -651,8 +707,8 @@ final searchResultsProvider = Provider<List<dynamic>>((ref) {
       p.description.toLowerCase().contains(query) ||
       p.skills.any((s) => s.toLowerCase().contains(query))));
   results.addAll(posts.where((p) =>
-      p.content?.toLowerCase().contains(query) ?? false ||
-      p.tags.any((t) => t.toLowerCase().contains(query))));
+      p.content?.toLowerCase().contains(query) ??
+      false || p.tags.any((t) => t.toLowerCase().contains(query))));
 
   return results;
 });
@@ -663,7 +719,9 @@ User _parseUserFromMap(Map<String, dynamic> data) {
   final skillsRaw = data['skills'];
   List<String> skills = [];
   if (skillsRaw is String) {
-    try { skills = List<String>.from(jsonDecode(skillsRaw)); } catch(_) {}
+    try {
+      skills = List<String>.from(jsonDecode(skillsRaw));
+    } catch (_) {}
   } else if (skillsRaw is List) {
     skills = skillsRaw.map((e) => e.toString()).toList();
   }
@@ -688,10 +746,15 @@ User _parseUserFromMap(Map<String, dynamic> data) {
 
 MessageType _messageTypeFromString(String type) {
   switch (type) {
-    case 'image': return MessageType.image;
-    case 'file': return MessageType.file;
-    case 'project': return MessageType.project;
-    case 'system': return MessageType.system;
-    default: return MessageType.text;
+    case 'image':
+      return MessageType.image;
+    case 'file':
+      return MessageType.file;
+    case 'project':
+      return MessageType.project;
+    case 'system':
+      return MessageType.system;
+    default:
+      return MessageType.text;
   }
 }
