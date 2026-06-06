@@ -80,7 +80,7 @@ class ApiService {
     final id = data['id'] as String?;
     if (id == null) return;
     _userIdToName[id] = data['name'] as String? ?? 'Пользователь';
-    _userIdToAvatar[id] = data['avatar_url'] as String? ?? '';
+    _userIdToAvatar[id] = _convertImageUrl(data['avatar_url'] as String?) ?? '';
     _userIdToEmail[id] = data['email'] as String? ?? '';
     _userIdToOnline[id] = (data['is_online'] as int?) == 1;
   }
@@ -99,6 +99,13 @@ class ApiService {
   bool _getUserOnline(String? userId) {
     if (userId == null) return false;
     return _userIdToOnline[userId] ?? false;
+  }
+
+  String _convertImageUrl(String? url) {
+    if (url != null && url.startsWith('/uploads/')) {
+      return '$_baseUrl$url';
+    }
+    return url ?? '';
   }
 
   /// Конвертировать ответ API в модель User
@@ -148,7 +155,7 @@ class ApiService {
       id: data['id'] ?? '',
       name: data['name'] ?? 'Пользователь',
       email: data['email'] ?? '',
-      avatarUrl: data['avatar_url'],
+      avatarUrl: _convertImageUrl(data['avatar_url']),
       bio: data['bio'],
       university: data['university'],
       faculty: data['faculty'],
@@ -833,7 +840,7 @@ class ApiService {
           id: id,
           name: name ?? 'Пользователь',
           email: data['sender_email'] ?? '',
-          avatarUrl: data['sender_avatar'],
+          avatarUrl: _convertImageUrl(data['sender_avatar']),
           isOnline: (data['sender_is_online'] as int?) == 1,
           createdAt: DateTime.now(),
           skills: [],
@@ -861,7 +868,7 @@ class ApiService {
       id: data['author_id'] ?? '',
       name: data['author_name'] ?? 'Пользователь',
       email: data['author_email'] ?? '',
-      avatarUrl: data['author_avatar'],
+      avatarUrl: _convertImageUrl(data['author_avatar']),
       university: data['author_university'],
       isOnline: _toBool(data['author_is_online']),
       createdAt: DateTime.now(),
@@ -933,7 +940,7 @@ class ApiService {
       id: data['author_id'] ?? '',
       name: data['author_name'] ?? 'Пользователь',
       email: data['author_email'] ?? '',
-      avatarUrl: data['avatar_url'] ?? data['author_avatar'],
+      avatarUrl: _convertImageUrl(data['avatar_url'] ?? data['author_avatar']),
       isOnline: _toBool(data['is_online'] ?? data['author_is_online']),
       createdAt: DateTime.now(),
       skills: [],
@@ -971,7 +978,7 @@ class ApiService {
       id: data['author_id'] ?? '',
       name: data['author_name'] ?? 'Пользователь',
       email: data['author_email'] ?? '',
-      avatarUrl: data['author_avatar'],
+      avatarUrl: _convertImageUrl(data['author_avatar']),
       university: data['author_university'],
       isOnline: _toBool(data['author_is_online']),
       createdAt: DateTime.now(),
