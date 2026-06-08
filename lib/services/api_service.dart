@@ -936,7 +936,7 @@ class ApiService {
 
     String? videoUrl;
     final rawVideoUrl = data['video_url'];
-    if (rawVideoUrl != null) {
+    if (rawVideoUrl != null && rawVideoUrl.toString().isNotEmpty) {
       final urlStr = rawVideoUrl.toString();
       videoUrl = urlStr.startsWith('/uploads/') ? '$_baseUrl$urlStr' : urlStr;
     }

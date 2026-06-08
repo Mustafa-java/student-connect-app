@@ -28,19 +28,27 @@ class _PostVideoPlayerState extends State<PostVideoPlayer> {
   }
 
   void _initController() {
-    _controller = VideoPlayerController.networkUrl(
-      Uri.parse(widget.videoUrl),
-    )..initialize().then((_) {
-        if (mounted) {
-          setState(() => _isInitialized = true);
-          _controller!.setLooping(true);
-          _controller!.setVolume(0);
-          _controller!.play();
-        }
-      }).catchError((error) {
-        debugPrint('VideoPlayer init error: $error');
-        if (mounted) setState(() => _isInitialized = false);
-      });
+    try {
+      final uri = Uri.tryParse(widget.videoUrl);
+      if (uri == null || !uri.hasScheme || widget.videoUrl.isEmpty) {
+        debugPrint('VideoPlayer: invalid URL: ${widget.videoUrl}');
+        return;
+      }
+      _controller = VideoPlayerController.networkUrl(uri)
+        ..initialize().then((_) {
+          if (mounted) {
+            setState(() => _isInitialized = true);
+            _controller!.setLooping(true);
+            _controller!.setVolume(0);
+            _controller!.play();
+          }
+        }).catchError((error) {
+          debugPrint('VideoPlayer init error: $error');
+          if (mounted) setState(() => _isInitialized = false);
+        });
+    } catch (e) {
+      debugPrint('VideoPlayer error: $e');
+    }
   }
 
   @override

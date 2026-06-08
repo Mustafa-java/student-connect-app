@@ -425,7 +425,7 @@ class _PostCardState extends State<PostCard>
   Widget _buildImagesCarousel(Post post) {
     final images =
         post.images.isNotEmpty ? post.images : post.project?.images ?? [];
-    final hasVideo = post.videoUrl != null;
+    final hasVideo = post.videoUrl != null && post.videoUrl!.isNotEmpty;
 
     if (images.isEmpty && !hasVideo) return const SizedBox.shrink();
 

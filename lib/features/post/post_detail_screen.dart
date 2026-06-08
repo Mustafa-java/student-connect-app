@@ -258,7 +258,7 @@ ${contentPreview.isNotEmpty ? '\n$contentPreview' : ''}
                 controller: _scrollController,
                 slivers: [
                   // Медиа (видео + карусель)
-                  if (post.videoUrl != null || images.isNotEmpty)
+                  if ((post.videoUrl != null && post.videoUrl!.isNotEmpty) || images.isNotEmpty)
                     SliverToBoxAdapter(child: _buildMediaCarousel(post, images)),
 
                   // Действия (лайк, поделиться, сохранить) — БЕЗ кнопки коммента
@@ -682,7 +682,7 @@ ${contentPreview.isNotEmpty ? '\n$contentPreview' : ''}
   Widget _buildMediaCarousel(Post post, List<String> images) {
     return Column(
       children: [
-        if (post.videoUrl != null)
+        if (post.videoUrl != null && post.videoUrl!.isNotEmpty)
           PostVideoPlayer(videoUrl: post.videoUrl!),
         if (images.isNotEmpty)
           Stack(
