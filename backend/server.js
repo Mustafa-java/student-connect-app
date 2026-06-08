@@ -9,6 +9,9 @@ const { v4: uuidv4 } = require('uuid');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { pool, initDatabase } = require('./database');
+const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
+const ffmpeg = require('fluent-ffmpeg');
+ffmpeg.setFfmpegPath(ffmpegPath);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -17,6 +20,26 @@ const JWT_SECRET = process.env.JWT_SECRET || 'student-connect-secret-key';
 // Получить базовый URL сервера
 function getBaseUrl(req) {
   return `${req.protocol}://${req.get('host')}`;
+}
+
+// Сгенерировать превью для видео
+function generateVideoThumbnail(videoPath) {
+  return new Promise((resolve) => {
+    const thumbName = `thumb_${path.basename(videoPath, path.extname(videoPath))}.jpg`;
+    const thumbPath = path.join(UPLOADS_DIR, thumbName);
+    ffmpeg(videoPath)
+      .screenshots({
+        timestamps: ['0.5'],
+        filename: thumbName,
+        folder: UPLOADS_DIR,
+        size: '480x?',
+      })
+      .on('end', () => resolve(thumbName))
+      .on('error', (err) => {
+        console.error('Thumbnail error:', err.message);
+        resolve(null);
+      });
+  });
 }
 
 // Конвертировать пути изображений в полные URL
@@ -354,13 +377,21 @@ app.get('/api/posts', authMiddleware, async (req, res) => {
     `);
 
     const baseUrl = getBaseUrl(req);
-    const posts = await Promise.all(result.rows.map(async (p) => ({
-      ...p,
-      images: JSON.stringify(convertImageUrls(p.images, baseUrl)),
-      author_skills: JSON.parse(p.author_skills || '[]'),
-      is_liked: await enrichPost(p.id, req.userId),
-      is_saved: await enrichPostSaved(p.id, req.userId)
-    })));
+    const posts = await Promise.all(result.rows.map(async (p) => {
+      let video_url = p.video_url;
+      if (video_url && video_url.startsWith('/uploads/')) video_url = `${baseUrl}${video_url}`;
+      let video_thumbnail_url = p.video_thumbnail_url;
+      if (video_thumbnail_url && video_thumbnail_url.startsWith('/uploads/')) video_thumbnail_url = `${baseUrl}${video_thumbnail_url}`;
+      return {
+        ...p,
+        video_url,
+        video_thumbnail_url,
+        images: JSON.stringify(convertImageUrls(p.images, baseUrl)),
+        author_skills: JSON.parse(p.author_skills || '[]'),
+        is_liked: await enrichPost(p.id, req.userId),
+        is_saved: await enrichPostSaved(p.id, req.userId)
+      };
+    }));
 
     res.json({ posts });
   } catch(e) {
@@ -401,7 +432,15 @@ app.post('/api/posts', authMiddleware, postUpload.fields([
     const imageUrls = imageFiles.map(file => `/uploads/${file.filename}`);
 
     // Получаем URL видео если загружено
-    const videoUrl = videoFiles.length > 0 ? `/uploads/${videoFiles[0].filename}` : null;
+    let videoUrl = null;
+    let videoThumbnailUrl = null;
+    if (videoFiles.length > 0) {
+      videoUrl = `/uploads/${videoFiles[0].filename}`;
+      const thumbName = await generateVideoThumbnail(videoFiles[0].path);
+      if (thumbName) {
+        videoThumbnailUrl = `/uploads/${thumbName}`;
+      }
+    }
 
     // Парсим tags если это строка
     let tagsArray = [];
@@ -415,8 +454,8 @@ app.post('/api/posts', authMiddleware, postUpload.fields([
 
     if (videoUrl) {
       await pool.query(
-        'INSERT INTO posts (id, author_id, content, project_id, images, tags, video_url) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-        [id, req.userId, content || null, project_id || null, JSON.stringify(imageUrls), JSON.stringify(tagsArray), videoUrl]
+        'INSERT INTO posts (id, author_id, content, project_id, images, tags, video_url, video_thumbnail_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+        [id, req.userId, content || null, project_id || null, JSON.stringify(imageUrls), JSON.stringify(tagsArray), videoUrl, videoThumbnailUrl]
       );
     } else {
       await pool.query(
@@ -437,6 +476,7 @@ app.post('/api/posts', authMiddleware, postUpload.fields([
     const post = result.rows[0];
     post.images = JSON.stringify(convertImageUrls(post.images, baseUrl));
     if (post.video_url) post.video_url = post.video_url.startsWith('/uploads/') ? `${baseUrl}${post.video_url}` : post.video_url;
+    if (post.video_thumbnail_url) post.video_thumbnail_url = post.video_thumbnail_url.startsWith('/uploads/') ? `${baseUrl}${post.video_thumbnail_url}` : post.video_thumbnail_url;
     post.author_skills = JSON.parse(post.author_skills || '[]');
     post.is_liked = await enrichPost(post.id, req.userId);
     post.is_saved = await enrichPostSaved(post.id, req.userId);
@@ -540,6 +580,8 @@ app.put('/api/posts/:id', authMiddleware, async (req, res) => {
     const baseUrl = getBaseUrl(req);
     const post = result.rows[0];
     post.images = JSON.stringify(convertImageUrls(post.images, baseUrl));
+    if (post.video_url) post.video_url = post.video_url.startsWith('/uploads/') ? `${baseUrl}${post.video_url}` : post.video_url;
+    if (post.video_thumbnail_url) post.video_thumbnail_url = post.video_thumbnail_url.startsWith('/uploads/') ? `${baseUrl}${post.video_thumbnail_url}` : post.video_thumbnail_url;
     post.author_skills = JSON.parse(post.author_skills || '[]');
     post.is_liked = await enrichPost(post.id, req.userId);
     post.is_saved = await enrichPostSaved(post.id, req.userId);

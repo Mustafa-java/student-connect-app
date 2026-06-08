@@ -735,12 +735,16 @@ class _OtherUserProfileScreenState
   }
 
   Widget _buildPostGridItem(Post post) {
-    final imageUrl = post.images.isNotEmpty
-        ? post.images.first
-        : post.project?.images.isNotEmpty == true
-            ? post.project!.images.first
-            : null;
     final hasVideo = post.videoUrl != null && post.videoUrl!.isNotEmpty;
+    // Приоритет: превью видео > первое изображение > изображение проекта > иконка
+    String? imageUrl;
+    if (post.videoThumbnailUrl != null && post.videoThumbnailUrl!.isNotEmpty) {
+      imageUrl = post.videoThumbnailUrl;
+    } else if (post.images.isNotEmpty) {
+      imageUrl = post.images.first;
+    } else if (post.project?.images.isNotEmpty == true) {
+      imageUrl = post.project!.images.first;
+    }
 
     return GestureDetector(
       onTap: () {

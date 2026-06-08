@@ -5,6 +5,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/widgets/custom_avatar.dart';
 import '../../core/widgets/smart_image.dart';
+import '../../core/widgets/post_video_player.dart';
 import '../../providers/app_providers.dart';
 import '../../services/api_service.dart';
 import '../../models/models.dart';
@@ -435,16 +436,22 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
             ),
-            // Изображения
-            if (post.images.isNotEmpty) ...[
+            // Медиа (видео или изображение)
+            if ((post.videoUrl != null && post.videoUrl!.isNotEmpty) || post.images.isNotEmpty) ...[
               const SizedBox(height: 10),
-              SmartImage(
-                imageUrl: post.images.first,
-                height: 150,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                borderRadius: BorderRadius.circular(8),
-              ),
+              if (post.videoUrl != null && post.videoUrl!.isNotEmpty)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: PostVideoPlayer(videoUrl: post.videoUrl!, height: 180),
+                )
+              else if (post.images.isNotEmpty)
+                SmartImage(
+                  imageUrl: post.images.first,
+                  height: 150,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  borderRadius: BorderRadius.circular(8),
+                ),
             ],
             // Теги
             if (post.tags.isNotEmpty) ...[

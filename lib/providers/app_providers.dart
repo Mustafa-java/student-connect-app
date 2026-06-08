@@ -115,7 +115,7 @@ class CurrentUserNotifier extends StateNotifier<User?> {
 
   void _startPolling() {
     _pollTimer?.cancel();
-    _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+    _pollTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       if (ApiService.instance.isAuthenticated) {
         _loadUser();
       }
@@ -166,7 +166,7 @@ final postsStreamProvider = StreamProvider<List<Post>>((ref) {
   }
 
   fetch();
-  final timer = Timer.periodic(const Duration(seconds: 10), (_) => fetch());
+  final timer = Timer.periodic(const Duration(seconds: 30), (_) => fetch());
   controller.onCancel = () => timer.cancel();
 
   return controller.stream;
@@ -216,7 +216,7 @@ final followingPostsStreamProvider = StreamProvider<List<Post>>((ref) {
   }
 
   fetch();
-  final timer = Timer.periodic(const Duration(seconds: 10), (_) => fetch());
+  final timer = Timer.periodic(const Duration(seconds: 30), (_) => fetch());
   controller.onCancel = () => timer.cancel();
 
   return controller.stream;
@@ -303,7 +303,7 @@ final projectsStreamProvider = StreamProvider<List<Project>>((ref) {
   }
 
   fetch();
-  final timer = Timer.periodic(const Duration(seconds: 5), (_) => fetch());
+  final timer = Timer.periodic(const Duration(seconds: 30), (_) => fetch());
   controller.onCancel = () => timer.cancel();
 
   return controller.stream;
@@ -334,7 +334,7 @@ final chatsStreamProvider = StreamProvider<List<Chat>>((ref) {
   }
 
   fetch();
-  final timer = Timer.periodic(const Duration(seconds: 3), (_) => fetch());
+  final timer = Timer.periodic(const Duration(seconds: 15), (_) => fetch());
   controller.onCancel = () => timer.cancel();
 
   return controller.stream;
@@ -446,7 +446,7 @@ final messagesStreamProvider =
   }
 
   fetch();
-  final timer = Timer.periodic(const Duration(seconds: 2), (_) => fetch());
+  final timer = Timer.periodic(const Duration(seconds: 10), (_) => fetch());
   controller.onCancel = () => timer.cancel();
 
   return controller.stream;
@@ -519,7 +519,7 @@ final commentsStreamProvider =
   }
 
   fetch();
-  final timer = Timer.periodic(const Duration(seconds: 5), (_) => fetch());
+  final timer = Timer.periodic(const Duration(seconds: 30), (_) => fetch());
   controller.onCancel = () => timer.cancel();
 
   return controller.stream;

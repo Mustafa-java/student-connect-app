@@ -10,6 +10,7 @@ class Post extends Equatable {
   final Project? project; // Связанный проект (если есть)
   final List<String> images;
   final String? videoUrl;
+  final String? videoThumbnailUrl;
   final List<String> tags;
   final int likesCount;
   final int commentsCount;
@@ -26,6 +27,7 @@ class Post extends Equatable {
     this.project,
     this.images = const [],
     this.videoUrl,
+    this.videoThumbnailUrl,
     this.tags = const [],
     this.likesCount = 0,
     this.commentsCount = 0,
@@ -44,6 +46,7 @@ class Post extends Equatable {
         project,
         images,
         videoUrl,
+        videoThumbnailUrl,
         tags,
         likesCount,
         commentsCount,
@@ -61,6 +64,7 @@ class Post extends Equatable {
     Project? project,
     List<String>? images,
     String? videoUrl,
+    String? videoThumbnailUrl,
     List<String>? tags,
     int? likesCount,
     int? commentsCount,
@@ -77,6 +81,7 @@ class Post extends Equatable {
       project: project ?? this.project,
       images: images ?? this.images,
       videoUrl: videoUrl ?? this.videoUrl,
+      videoThumbnailUrl: videoThumbnailUrl ?? this.videoThumbnailUrl,
       tags: tags ?? this.tags,
       likesCount: likesCount ?? this.likesCount,
       commentsCount: commentsCount ?? this.commentsCount,
@@ -96,6 +101,7 @@ class Post extends Equatable {
       'project': project?.toJson(),
       'images': images,
       'videoUrl': videoUrl,
+      'videoThumbnailUrl': videoThumbnailUrl,
       'tags': tags,
       'likesCount': likesCount,
       'commentsCount': commentsCount,
@@ -117,6 +123,7 @@ class Post extends Equatable {
       images:
           json['images'] != null ? List<String>.from(json['images']) : const [],
       videoUrl: json['videoUrl'],
+      videoThumbnailUrl: json['videoThumbnailUrl'],
       tags: json['tags'] != null ? List<String>.from(json['tags']) : const [],
       likesCount: json['likesCount'] ?? 0,
       commentsCount: json['commentsCount'] ?? 0,

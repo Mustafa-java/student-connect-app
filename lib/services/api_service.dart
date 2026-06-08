@@ -947,6 +947,12 @@ class ApiService {
       final urlStr = rawVideoUrl.toString();
       videoUrl = urlStr.startsWith('/uploads/') ? '$_baseUrl$urlStr' : urlStr;
     }
+    String? videoThumbnailUrl;
+    final rawThumb = data['video_thumbnail_url'];
+    if (rawThumb != null && rawThumb.toString().isNotEmpty) {
+      final urlStr = rawThumb.toString();
+      videoThumbnailUrl = urlStr.startsWith('/uploads/') ? '$_baseUrl$urlStr' : urlStr;
+    }
 
     return Post(
       id: data['id'] ?? '',
@@ -954,6 +960,7 @@ class ApiService {
       content: data['content'],
       images: images,
       videoUrl: videoUrl,
+      videoThumbnailUrl: videoThumbnailUrl,
       tags: tags,
       likesCount: _toInt(data['likes_count']),
       commentsCount: _toInt(data['comments_count']),
