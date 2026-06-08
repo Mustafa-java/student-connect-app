@@ -392,10 +392,17 @@ app.post('/api/posts', authMiddleware, uploadImages.array('images', 5), (req, re
       }
     }
 
-    await pool.query(
-      'INSERT INTO posts (id, author_id, content, project_id, images, tags, video_url) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-      [id, req.userId, content || null, project_id || null, JSON.stringify(imageUrls), JSON.stringify(tagsArray), videoUrl]
-    );
+    if (videoUrl) {
+      await pool.query(
+        'INSERT INTO posts (id, author_id, content, project_id, images, tags, video_url) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+        [id, req.userId, content || null, project_id || null, JSON.stringify(imageUrls), JSON.stringify(tagsArray), videoUrl]
+      );
+    } else {
+      await pool.query(
+        'INSERT INTO posts (id, author_id, content, project_id, images, tags) VALUES ($1, $2, $3, $4, $5, $6)',
+        [id, req.userId, content || null, project_id || null, JSON.stringify(imageUrls), JSON.stringify(tagsArray)]
+      );
+    }
 
     const result = await pool.query(`
       SELECT p.*, u.name as author_name, u.email as author_email, u.avatar_url as author_avatar,
