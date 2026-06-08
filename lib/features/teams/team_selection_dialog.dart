@@ -217,12 +217,16 @@ class _TeamSelectionDialogState extends ConsumerState<TeamSelectionDialog> {
               child: const Text('Отмена'),
             ),
             const SizedBox(width: 8),
-            ElevatedButton(
-              onPressed: _createAndInvite,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
+            Flexible(
+              child: ElevatedButton(
+                onPressed: _createAndInvite,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                ),
+                child: const FittedBox(
+                  child: Text('Создать и пригласить'),
+                ),
               ),
-              child: const Text('Создать и пригласить'),
             ),
           ],
         ),
