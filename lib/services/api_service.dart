@@ -935,9 +935,10 @@ class ApiService {
     }
 
     String? videoUrl;
-    if (data['video_url'] != null) {
-      videoUrl = data['video_url'];
-      if (videoUrl.startsWith('/uploads/')) videoUrl = '$_baseUrl$videoUrl';
+    final rawVideoUrl = data['video_url'];
+    if (rawVideoUrl != null) {
+      final urlStr = rawVideoUrl.toString();
+      videoUrl = urlStr.startsWith('/uploads/') ? '$_baseUrl$urlStr' : urlStr;
     }
 
     return Post(
