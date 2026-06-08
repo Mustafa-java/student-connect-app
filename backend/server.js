@@ -369,18 +369,39 @@ app.get('/api/posts', authMiddleware, async (req, res) => {
   }
 });
 
-app.post('/api/posts', authMiddleware, uploadImages.array('images', 5), (req, res, next) => {
-  uploadVideo.single('video')(req, res, next);
-}, async (req, res) => {
+const postUpload = multer({
+  storage: imageStorage,
+  limits: { fileSize: 100 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const imageExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+    const videoExts = ['.mp4', '.mov', '.avi', '.mkv', '.webm', '.3gp'];
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (imageExts.includes(ext) || videoExts.includes(ext) ||
+        file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Только изображения и видео'));
+    }
+  }
+});
+
+app.post('/api/posts', authMiddleware, postUpload.fields([
+  { name: 'images', maxCount: 5 },
+  { name: 'video', maxCount: 1 }
+]), async (req, res) => {
   try {
     const { content, project_id, tags } = req.body;
     const id = uuidv4();
 
+    const uploadedFiles = req.files || {};
+    const imageFiles = uploadedFiles['images'] || [];
+    const videoFiles = uploadedFiles['video'] || [];
+
     // Получаем URL загруженных изображений
-    const imageUrls = req.files ? req.files.map(file => `/uploads/${file.filename}`) : [];
+    const imageUrls = imageFiles.map(file => `/uploads/${file.filename}`);
 
     // Получаем URL видео если загружено
-    const videoUrl = req.file ? `/uploads/${req.file.filename}` : null;
+    const videoUrl = videoFiles.length > 0 ? `/uploads/${videoFiles[0].filename}` : null;
 
     // Парсим tags если это строка
     let tagsArray = [];
