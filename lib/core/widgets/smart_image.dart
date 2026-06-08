@@ -70,8 +70,8 @@ class SmartImage extends StatelessWidget {
         fit: fit,
         placeholder: (context, url) => placeholder ?? _defaultPlaceholder(),
         errorWidget: (context, url, error) => errorWidget ?? _defaultErrorWidget(),
-        memCacheWidth: width?.toInt(),
-        memCacheHeight: height?.toInt(),
+        memCacheWidth: width != null && width.isFinite ? width.toInt() : null,
+        memCacheHeight: height != null && height.isFinite ? height.toInt() : null,
       );
     }
 
