@@ -95,6 +95,28 @@ const uploadImages = multer({
   }
 });
 
+// Настройка multer для видео
+const videoStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, UPLOADS_DIR),
+  filename: (req, file, cb) => {
+    const uniqueName = `video_${Date.now()}-${uuidv4()}${path.extname(file.originalname)}`;
+    cb(null, uniqueName);
+  }
+});
+const uploadVideo = multer({
+  storage: videoStorage,
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB max
+  fileFilter: (req, file, cb) => {
+    const allowed = ['.mp4', '.mov', '.avi', '.mkv', '.webm', '.3gp'];
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (allowed.includes(ext) || file.mimetype.startsWith('video/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Только видео файлы'));
+    }
+  }
+});
+
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -347,13 +369,18 @@ app.get('/api/posts', authMiddleware, async (req, res) => {
   }
 });
 
-app.post('/api/posts', authMiddleware, uploadImages.array('images', 5), async (req, res) => {
+app.post('/api/posts', authMiddleware, uploadImages.array('images', 5), (req, res, next) => {
+  uploadVideo.single('video')(req, res, next);
+}, async (req, res) => {
   try {
     const { content, project_id, tags } = req.body;
     const id = uuidv4();
 
     // Получаем URL загруженных изображений
     const imageUrls = req.files ? req.files.map(file => `/uploads/${file.filename}`) : [];
+
+    // Получаем URL видео если загружено
+    const videoUrl = req.file ? `/uploads/${req.file.filename}` : null;
 
     // Парсим tags если это строка
     let tagsArray = [];
@@ -366,8 +393,8 @@ app.post('/api/posts', authMiddleware, uploadImages.array('images', 5), async (r
     }
 
     await pool.query(
-      'INSERT INTO posts (id, author_id, content, project_id, images, tags) VALUES ($1, $2, $3, $4, $5, $6)',
-      [id, req.userId, content || null, project_id || null, JSON.stringify(imageUrls), JSON.stringify(tagsArray)]
+      'INSERT INTO posts (id, author_id, content, project_id, images, tags, video_url) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+      [id, req.userId, content || null, project_id || null, JSON.stringify(imageUrls), JSON.stringify(tagsArray), videoUrl]
     );
 
     const result = await pool.query(`
@@ -381,11 +408,12 @@ app.post('/api/posts', authMiddleware, uploadImages.array('images', 5), async (r
     const baseUrl = getBaseUrl(req);
     const post = result.rows[0];
     post.images = JSON.stringify(convertImageUrls(post.images, baseUrl));
+    if (post.video_url) post.video_url = post.video_url.startsWith('/uploads/') ? `${baseUrl}${post.video_url}` : post.video_url;
     post.author_skills = JSON.parse(post.author_skills || '[]');
     post.is_liked = await enrichPost(post.id, req.userId);
     post.is_saved = await enrichPostSaved(post.id, req.userId);
 
-    console.log('Post created with images:', imageUrls);
+    console.log('Post created with images:', imageUrls, 'video:', videoUrl);
     res.status(201).json({ post });
   } catch(e) {
     console.error('Create post error:', e);

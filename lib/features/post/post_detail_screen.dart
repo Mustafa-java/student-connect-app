@@ -6,6 +6,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/custom_avatar.dart';
 import '../../core/widgets/smart_image.dart';
+import '../../core/widgets/post_video_player.dart';
 import '../../providers/app_providers.dart';
 import '../../models/models.dart';
 import '../../services/api_service.dart';
@@ -256,9 +257,9 @@ ${contentPreview.isNotEmpty ? '\n$contentPreview' : ''}
               child: CustomScrollView(
                 controller: _scrollController,
                 slivers: [
-                  // Изображение (карусель)
-                  if (images.isNotEmpty)
-                    SliverToBoxAdapter(child: _buildImagesCarousel(images)),
+                  // Медиа (видео + карусель)
+                  if (post.videoUrl != null || images.isNotEmpty)
+                    SliverToBoxAdapter(child: _buildMediaCarousel(post, images)),
 
                   // Действия (лайк, поделиться, сохранить) — БЕЗ кнопки коммента
                   SliverToBoxAdapter(child: _buildActionButtons(post)),
@@ -678,61 +679,67 @@ ${contentPreview.isNotEmpty ? '\n$contentPreview' : ''}
     );
   }
 
-  Widget _buildImagesCarousel(List<String> images) {
-    return Stack(
+  Widget _buildMediaCarousel(Post post, List<String> images) {
+    return Column(
       children: [
-        CarouselSlider(
-          options: CarouselOptions(
-            height: 400,
-            viewportFraction: 1.0,
-            onPageChanged: (index, reason) {
-              setState(() => _currentImageIndex = index);
-            },
-          ),
-          carouselController: _carouselController,
-          items: images.map((imageUrl) {
-            return GestureDetector(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => ImageViewerScreen(
-                      imageUrls: images,
-                      initialIndex: _currentImageIndex,
+        if (post.videoUrl != null)
+          PostVideoPlayer(videoUrl: post.videoUrl!),
+        if (images.isNotEmpty)
+          Stack(
+            children: [
+              CarouselSlider(
+                options: CarouselOptions(
+                  height: 400,
+                  viewportFraction: 1.0,
+                  onPageChanged: (index, reason) {
+                    setState(() => _currentImageIndex = index);
+                  },
+                ),
+                carouselController: _carouselController,
+                items: images.map((imageUrl) {
+                  return GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ImageViewerScreen(
+                            imageUrls: images,
+                            initialIndex: _currentImageIndex,
+                          ),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      color: AppColors.backgroundDark,
+                      child: SmartImage(
+                        imageUrl: imageUrl,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+              if (images.length > 1)
+                Positioned(
+                  top: 12,
+                  right: 12,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.6),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${_currentImageIndex + 1}/${images.length}',
+                      style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600),
                     ),
                   ),
-                );
-              },
-              child: Container(
-                color: AppColors.backgroundDark,
-                child: SmartImage(
-                  imageUrl: imageUrl,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
                 ),
-              ),
-            );
-          }).toList(),
-        ),
-        // Индикатор страниц
-        if (images.length > 1)
-          Positioned(
-            top: 12,
-            right: 12,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.6),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                '${_currentImageIndex + 1}/${images.length}',
-                style: const TextStyle(
-                    fontSize: 12,
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600),
-              ),
-            ),
+            ],
           ),
       ],
     );

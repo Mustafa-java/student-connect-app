@@ -51,6 +51,7 @@ async function initDatabase() {
         content TEXT,
         project_id TEXT,
         images TEXT DEFAULT '[]',
+        video_url TEXT,
         tags TEXT DEFAULT '[]',
         likes_count INTEGER DEFAULT 0,
         comments_count INTEGER DEFAULT 0,
@@ -58,6 +59,13 @@ async function initDatabase() {
         created_at BIGINT DEFAULT EXTRACT(EPOCH FROM NOW()) * 1000
       )
     `);
+
+    // Migration: add video_url column if not exists
+    try {
+      await client.query('ALTER TABLE posts ADD COLUMN video_url TEXT');
+    } catch (e) {
+      // column already exists, ignore
+    }
 
     // Post likes table
     await client.query(`

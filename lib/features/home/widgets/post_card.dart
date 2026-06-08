@@ -4,9 +4,11 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:readmore/readmore.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:video_player/video_player.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/custom_avatar.dart';
 import '../../../core/widgets/smart_image.dart';
+import '../../../core/widgets/post_video_player.dart';
 import '../../../features/common/image_viewer_screen.dart';
 import '../../../features/common/comments_bottom_sheet.dart';
 import '../../../features/common/share_to_chat_screen.dart';
@@ -423,46 +425,50 @@ class _PostCardState extends State<PostCard>
   Widget _buildImagesCarousel(Post post) {
     final images =
         post.images.isNotEmpty ? post.images : post.project?.images ?? [];
+    final hasVideo = post.videoUrl != null;
 
-    if (images.isEmpty) return const SizedBox.shrink();
+    if (images.isEmpty && !hasVideo) return const SizedBox.shrink();
 
     return Column(
       children: [
-        CarouselSlider(
-          options: CarouselOptions(
-            height: 350,
-            viewportFraction: 1.0,
-            onPageChanged: (index, reason) {
-              setState(() {
-                _currentImageIndex = index;
-              });
-            },
-          ),
-          carouselController: _carouselController,
-          items: images.map((imageUrl) {
-            return GestureDetector(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => ImageViewerScreen(
-                      imageUrls: images,
-                      initialIndex: _currentImageIndex,
-                    ),
-                  ),
-                );
+        if (hasVideo)
+          PostVideoPlayer(videoUrl: post.videoUrl!),
+        if (images.isNotEmpty)
+          CarouselSlider(
+            options: CarouselOptions(
+              height: 350,
+              viewportFraction: 1.0,
+              onPageChanged: (index, reason) {
+                setState(() {
+                  _currentImageIndex = index;
+                });
               },
-              child: Container(
-                color: AppColors.surfaceDark,
-                child: SmartImage(
-                  imageUrl: imageUrl,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
+            ),
+            carouselController: _carouselController,
+            items: images.map((imageUrl) {
+              return GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ImageViewerScreen(
+                        imageUrls: images,
+                        initialIndex: _currentImageIndex,
+                      ),
+                    ),
+                  );
+                },
+                child: Container(
+                  color: AppColors.surfaceDark,
+                  child: SmartImage(
+                    imageUrl: imageUrl,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
                 ),
-              ),
-            );
-          }).toList(),
-        ),
+              );
+            }).toList(),
+          ),
 
         // Индикатор страниц
         if (images.length > 1) ...[

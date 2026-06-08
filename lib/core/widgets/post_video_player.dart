@@ -1,0 +1,123 @@
+import 'package:flutter/material.dart';
+import 'package:video_player/video_player.dart';
+import '../theme/app_colors.dart';
+
+/// Виджет для проигрывания видео в постах
+class PostVideoPlayer extends StatefulWidget {
+  final String videoUrl;
+  final double? height;
+
+  const PostVideoPlayer({
+    super.key,
+    required this.videoUrl,
+    this.height,
+  });
+
+  @override
+  State<PostVideoPlayer> createState() => _PostVideoPlayerState();
+}
+
+class _PostVideoPlayerState extends State<PostVideoPlayer> {
+  VideoPlayerController? _controller;
+  bool _isInitialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initController();
+  }
+
+  void _initController() {
+    _controller = VideoPlayerController.networkUrl(
+      Uri.parse(widget.videoUrl),
+    )..initialize().then((_) {
+        if (mounted) {
+          setState(() => _isInitialized = true);
+          _controller!.setLooping(true);
+          _controller!.setVolume(0);
+          _controller!.play();
+        }
+      }).catchError((error) {
+        debugPrint('VideoPlayer init error: $error');
+        if (mounted) setState(() => _isInitialized = false);
+      });
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  void _togglePlay() {
+    if (_controller == null) return;
+    if (_controller!.value.isPlaying) {
+      _controller!.pause();
+    } else {
+      _controller!.play();
+    }
+    setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final height = widget.height ?? 350;
+
+    if (!_isInitialized) {
+      return Container(
+        height: height,
+        color: Colors.black,
+        child: const Center(
+          child: CircularProgressIndicator(color: Colors.white),
+        ),
+      );
+    }
+
+    final videoSize = _controller!.value.size;
+    final aspectRatio = videoSize.width > 0 && videoSize.height > 0
+        ? videoSize.aspectRatio
+        : 16 / 9;
+
+    return GestureDetector(
+      onTap: _togglePlay,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          AspectRatio(
+            aspectRatio: aspectRatio,
+            child: VideoPlayer(_controller!),
+          ),
+          if (!_controller!.value.isPlaying)
+            Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.5),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.play_arrow_rounded,
+                size: 40,
+                color: Colors.white,
+              ),
+            ),
+          Positioned(
+            bottom: 8,
+            left: 0,
+            right: 0,
+            child: VideoProgressIndicator(
+              _controller!,
+              allowScrubbing: true,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              colors: VideoProgressColors(
+                playedColor: AppColors.primary,
+                bufferedColor: Colors.white24,
+                backgroundColor: Colors.white10,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

@@ -739,6 +739,8 @@ MessageType _messageTypeFromString(String type) {
       return MessageType.file;
     case 'project':
       return MessageType.project;
+    case 'post':
+      return MessageType.post;
     case 'system':
       return MessageType.system;
     default:

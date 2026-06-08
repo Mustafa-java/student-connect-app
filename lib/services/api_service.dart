@@ -381,6 +381,7 @@ class ApiService {
     String? projectId,
     List<String> images = const [],
     List<String> tags = const [],
+    String? videoPath,
   }) async {
     // Создаем FormData для отправки файлов
     final formData = FormData();
@@ -403,6 +404,18 @@ class ApiService {
         formData.files.add(MapEntry(
           'images',
           await MultipartFile.fromFile(imagePath, filename: fileName),
+        ));
+      }
+    }
+
+    // Добавляем видео если есть
+    if (videoPath != null) {
+      final videoFile = File(videoPath);
+      if (await videoFile.exists()) {
+        final fileName = videoPath.split('/').last;
+        formData.files.add(MapEntry(
+          'video',
+          await MultipartFile.fromFile(videoPath, filename: fileName),
         ));
       }
     }
@@ -921,11 +934,18 @@ class ApiService {
       }
     }
 
+    String? videoUrl;
+    if (data['video_url'] != null) {
+      videoUrl = data['video_url'];
+      if (videoUrl.startsWith('/uploads/')) videoUrl = '$_baseUrl$videoUrl';
+    }
+
     return Post(
       id: data['id'] ?? '',
       author: author,
       content: data['content'],
       images: images,
+      videoUrl: videoUrl,
       tags: tags,
       likesCount: _toInt(data['likes_count']),
       commentsCount: _toInt(data['comments_count']),

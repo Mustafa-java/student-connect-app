@@ -20,6 +20,7 @@ class CreatePostScreen extends ConsumerStatefulWidget {
 class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
   final _contentController = TextEditingController();
   final List<XFile> _images = [];
+  XFile? _video;
   final Set<String> _selectedTags = {};
   bool _isPosting = false;
 
@@ -56,15 +57,29 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
     }
   }
 
+  Future<void> _pickVideo() async {
+    final video = await _picker.pickVideo(
+      source: ImageSource.gallery,
+      maxDuration: const Duration(seconds: 60),
+    );
+    if (video != null) {
+      setState(() => _video = video);
+    }
+  }
+
   void _removeImage(int index) {
     setState(() => _images.removeAt(index));
   }
 
+  void _removeVideo() {
+    setState(() => _video = null);
+  }
+
   Future<void> _publishPost() async {
-    if (_contentController.text.trim().isEmpty && _images.isEmpty) {
+    if (_contentController.text.trim().isEmpty && _images.isEmpty && _video == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Напишите что-нибудь или добавьте фото'),
+            content: Text('Напишите что-нибудь или добавьте медиа'),
             backgroundColor: AppColors.error),
       );
       return;
@@ -78,7 +93,6 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
     final authorId = user.id;
     final postId = 'post_${DateTime.now().millisecondsSinceEpoch}';
 
-    // Сохраняем пути изображений
     final imagePaths = _images.map((x) => x.path).toList();
 
     final postAuthor = User(
@@ -98,6 +112,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
       author: postAuthor,
       content: _contentController.text.trim(),
       images: imagePaths,
+      videoUrl: _video?.path,
       tags: _selectedTags.toList(),
       likesCount: 0,
       commentsCount: 0,
@@ -105,12 +120,12 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
       createdAt: DateTime.now(),
     );
 
-    // Сохраняем через API
     try {
       await ApiService.instance.createPost(
         content: _contentController.text.trim().isEmpty ? null : _contentController.text.trim(),
         images: _images.map((f) => f.path).toList(),
         tags: _selectedTags.toList(),
+        videoPath: _video?.path,
       );
     } catch (e) {
       debugPrint('createPost API error: $e');
@@ -162,8 +177,8 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // Фото
-          if (_images.isNotEmpty) ...[
+          // Медиа превью
+          if (_images.isNotEmpty || _video != null) ...[
             SizedBox(
               height: 100,
               child: ListView(
@@ -199,7 +214,43 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                       ),
                     );
                   }),
-                  if (_images.length < 5)
+                  if (_video != null)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: Stack(
+                        children: [
+                          Container(
+                            width: 100,
+                            height: 100,
+                            decoration: BoxDecoration(
+                              color: Colors.black,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Center(
+                              child: Icon(Icons.play_circle_fill,
+                                  size: 40, color: Colors.white70),
+                            ),
+                          ),
+                          Positioned(
+                            top: 4,
+                            right: 4,
+                            child: GestureDetector(
+                              onTap: _removeVideo,
+                              child: Container(
+                                width: 24,
+                                height: 24,
+                                decoration: const BoxDecoration(
+                                    color: Colors.black54,
+                                    shape: BoxShape.circle),
+                                child: const Icon(Icons.close,
+                                    size: 16, color: Colors.white),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (_images.length < 5 && _video == null)
                     GestureDetector(
                       onTap: _pickImages,
                       child: Container(
@@ -262,6 +313,15 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
               Text('${_images.length}/5',
                   style: TextStyle(
                       fontSize: 12, color: AppColors.textDarkSecondary)),
+              const SizedBox(width: 16),
+              OutlinedButton.icon(
+                onPressed: _video == null ? _pickVideo : null,
+                icon: const Icon(Icons.videocam_outlined, size: 18),
+                label: const Text('Видео'),
+                style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.textDark,
+                    side: const BorderSide(color: AppColors.divider)),
+              ),
             ],
           ),
           const SizedBox(height: 24),
