@@ -9,9 +9,17 @@ const { v4: uuidv4 } = require('uuid');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { pool, initDatabase } = require('./database');
-const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
-const ffmpeg = require('fluent-ffmpeg');
-ffmpeg.setFfmpegPath(ffmpegPath);
+
+// ffmpeg для превью видео — graceful fallback
+let ffmpeg = null;
+try {
+  const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
+  ffmpeg = require('fluent-ffmpeg');
+  ffmpeg.setFfmpegPath(ffmpegPath);
+  console.log('✅ ffmpeg loaded for video thumbnails');
+} catch (e) {
+  console.warn('⚠️ ffmpeg not available, video thumbnails disabled:', e.message);
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -25,8 +33,8 @@ function getBaseUrl(req) {
 // Сгенерировать превью для видео
 function generateVideoThumbnail(videoPath) {
   return new Promise((resolve) => {
+    if (!ffmpeg) return resolve(null);
     const thumbName = `thumb_${path.basename(videoPath, path.extname(videoPath))}.jpg`;
-    const thumbPath = path.join(UPLOADS_DIR, thumbName);
     ffmpeg(videoPath)
       .screenshots({
         timestamps: ['0.5'],

@@ -20,6 +20,7 @@ class PostVideoPlayer extends StatefulWidget {
 class _PostVideoPlayerState extends State<PostVideoPlayer> {
   VideoPlayerController? _controller;
   bool _isInitialized = false;
+  bool _hasError = false;
 
   @override
   void initState() {
@@ -32,6 +33,7 @@ class _PostVideoPlayerState extends State<PostVideoPlayer> {
       final uri = Uri.tryParse(widget.videoUrl);
       if (uri == null || !uri.hasScheme || widget.videoUrl.isEmpty) {
         debugPrint('VideoPlayer: invalid URL: ${widget.videoUrl}');
+        if (mounted) setState(() => _hasError = true);
         return;
       }
       _controller = VideoPlayerController.networkUrl(uri)
@@ -44,10 +46,20 @@ class _PostVideoPlayerState extends State<PostVideoPlayer> {
           }
         }).catchError((error) {
           debugPrint('VideoPlayer init error: $error');
-          if (mounted) setState(() => _isInitialized = false);
+          if (mounted) setState(() => _hasError = true);
         });
+
+      // Таймаут 15 секунд — если видео не загрузилось, показываем ошибку
+      Future.delayed(const Duration(seconds: 15), () {
+        if (mounted && !_isInitialized && !_hasError) {
+          setState(() => _hasError = true);
+          _controller?.dispose();
+          _controller = null;
+        }
+      });
     } catch (e) {
       debugPrint('VideoPlayer error: $e');
+      if (mounted) setState(() => _hasError = true);
     }
   }
 
@@ -70,6 +82,26 @@ class _PostVideoPlayerState extends State<PostVideoPlayer> {
   @override
   Widget build(BuildContext context) {
     final height = widget.height ?? 350;
+
+    if (_hasError) {
+      return Container(
+        height: height,
+        color: Colors.black26,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.videocam_off_rounded, size: 40, color: Colors.white38),
+              const SizedBox(height: 8),
+              Text(
+                'Видео недоступно',
+                style: TextStyle(fontSize: 13, color: Colors.white54),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     if (!_isInitialized) {
       return Container(
