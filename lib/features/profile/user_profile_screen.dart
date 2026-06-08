@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/custom_avatar.dart';
 import '../../core/utils/page_transitions.dart';
@@ -341,35 +342,25 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen>
       child: Stack(
         fit: StackFit.expand,
         children: [
-          Image.network(
-            imageUrl,
+          CachedNetworkImage(
+            imageUrl: imageUrl,
             fit: BoxFit.cover,
-            loadingBuilder: (context, child, loadingProgress) {
-              if (loadingProgress == null) return child;
-              return Container(
-                color: AppColors.skeleton,
-                child: Center(
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    value: loadingProgress.expectedTotalBytes != null
-                        ? loadingProgress.cumulativeBytesLoaded /
-                            loadingProgress.expectedTotalBytes!
-                        : null,
-                    valueColor:
-                        AlwaysStoppedAnimation<Color>(AppColors.primary),
-                  ),
+            placeholder: (context, url) => Container(
+              color: AppColors.skeleton,
+              child: Center(
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
                 ),
-              );
-            },
-            errorBuilder: (context, error, stackTrace) {
-              return Container(
-                color: AppColors.surfaceDark,
-                child: const Icon(
-                  Icons.image_not_supported_outlined,
-                  color: AppColors.textDarkSecondary,
-                ),
-              );
-            },
+              ),
+            ),
+            errorWidget: (context, url, error) => Container(
+              color: AppColors.surfaceDark,
+              child: const Icon(
+                Icons.image_not_supported_outlined,
+                color: AppColors.textDarkSecondary,
+              ),
+            ),
           ),
           Positioned(
             bottom: 0,

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../theme/app_colors.dart';
 
 /// Универсальный виджет для отображения изображений
@@ -62,18 +63,15 @@ class SmartImage extends StatelessWidget {
         },
       );
     } else {
-      imageWidget = Image.network(
-        imageUrl,
+      imageWidget = CachedNetworkImage(
+        imageUrl: imageUrl,
         width: width,
         height: height,
         fit: fit,
-        loadingBuilder: (context, child, loadingProgress) {
-          if (loadingProgress == null) return child;
-          return placeholder ?? _defaultPlaceholder();
-        },
-        errorBuilder: (context, error, stackTrace) {
-          return errorWidget ?? _defaultErrorWidget();
-        },
+        placeholder: (context, url) => placeholder ?? _defaultPlaceholder(),
+        errorWidget: (context, url, error) => errorWidget ?? _defaultErrorWidget(),
+        memCacheWidth: width?.toInt(),
+        memCacheHeight: height?.toInt(),
       );
     }
 
