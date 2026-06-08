@@ -393,12 +393,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                       ),
                     )
                   : SliverPadding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      sliver: SliverList(
+                      padding: const EdgeInsets.all(2),
+                      sliver: SliverGrid(
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 3,
+                          crossAxisSpacing: 2,
+                          mainAxisSpacing: 2,
+                        ),
                         delegate: SliverChildBuilderDelegate(
                           (context, index) {
                             final post = userPosts[index];
-                            return _buildPostListItem(post);
+                            return _buildPostGridItem(post);
                           },
                           childCount: userPosts.length,
                         ),
@@ -458,12 +464,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                       ),
                     )
                   : SliverPadding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      sliver: SliverList(
+                      padding: const EdgeInsets.all(2),
+                      sliver: SliverGrid(
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 3,
+                          crossAxisSpacing: 2,
+                          mainAxisSpacing: 2,
+                        ),
                         delegate: SliverChildBuilderDelegate(
                           (context, index) {
                             if (index < _savedPosts.length) {
-                              return _buildPostListItem(_savedPosts[index]);
+                              return _buildPostGridItem(_savedPosts[index]);
                             }
                             return const SizedBox.shrink();
                           },
@@ -547,7 +559,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     ).animate().fadeIn(duration: const Duration(milliseconds: 300));
   }
 
-  Widget _buildPostListItem(Post post) {
+  Widget _buildPostGridItem(Post post) {
+    final imageUrl = post.images.isNotEmpty
+        ? post.images.first
+        : post.project?.images.isNotEmpty == true
+            ? post.project!.images.first
+            : null;
+    final hasVideo = post.videoUrl != null && post.videoUrl!.isNotEmpty;
+
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -556,75 +575,46 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
         );
       },
       onLongPress: () => _confirmDeletePost(post),
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: AppColors.surfaceDark,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.divider.withValues(alpha: 0.3)),
-        ),
-        child: Row(
-          children: [
-            if (post.images.isNotEmpty)
-              SmartImage(
-                imageUrl: post.images.first,
-                width: 50,
-                height: 50,
-                fit: BoxFit.cover,
-                borderRadius: BorderRadius.circular(8),
-              )
-            else
-              Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceDarkLight,
-                  borderRadius: BorderRadius.circular(8),
+      child: AspectRatio(
+        aspectRatio: 1,
+        child: Container(
+          color: AppColors.surfaceDarkLight,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (imageUrl != null)
+                SmartImage(
+                  imageUrl: imageUrl,
+                  fit: BoxFit.cover,
+                )
+              else
+                Center(
+                  child: Icon(
+                    hasVideo ? Icons.videocam_outlined : Icons.article_outlined,
+                    size: 32,
+                    color: AppColors.textDarkSecondary,
+                  ),
                 ),
-                child: const Icon(Icons.article_outlined,
-                    size: 20, color: AppColors.textDarkSecondary),
-              ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    post.title,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
+              if (hasVideo)
+                Positioned(
+                  top: 4,
+                  right: 4,
+                  child: Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.6),
+                      shape: BoxShape.circle,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    child: const Icon(
+                      Icons.play_arrow_rounded,
+                      size: 16,
+                      color: Colors.white,
+                    ),
                   ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(Icons.favorite_border,
-                          size: 14, color: AppColors.textDarkSecondary),
-                      const SizedBox(width: 4),
-                      Text('${post.likesCount}',
-                          style: TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textDarkSecondary)),
-                      const SizedBox(width: 8),
-                      Icon(Icons.chat_bubble_outline,
-                          size: 14, color: AppColors.textDarkSecondary),
-                      const SizedBox(width: 4),
-                      Text('${post.commentsCount}',
-                          style: TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textDarkSecondary)),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            Icon(Icons.arrow_forward_ios,
-                size: 14, color: AppColors.textDarkSecondary),
-          ],
+                ),
+            ],
+          ),
         ),
       ),
     );

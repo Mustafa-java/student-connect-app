@@ -68,7 +68,7 @@ class _PostCardState extends State<PostCard>
           _buildHeader(author),
 
           // Изображения (карусель)
-          if (post.images.isNotEmpty || post.project?.images.isNotEmpty == true)
+          if (post.images.isNotEmpty || post.project?.images.isNotEmpty == true || (post.videoUrl != null && post.videoUrl!.isNotEmpty))
             GestureDetector(
               onDoubleTap: _handleDoubleTap,
               child: Stack(

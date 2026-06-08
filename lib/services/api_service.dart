@@ -38,6 +38,13 @@ class ApiService {
       validateStatus: (status) => status != null && status < 500,
     ));
 
+    _dio.interceptors.add(InterceptorsWrapper(
+      onError: (error, handler) {
+        debugPrint('🔴 Dio 500 | ${error.requestOptions.method} ${error.requestOptions.path} | ${error.response?.statusCode}');
+        handler.next(error);
+      },
+    ));
+
     final prefs = await SharedPreferences.getInstance();
     _token = prefs.getString(_tokenKey);
     _currentUserId = prefs.getString(_userIdKey);
