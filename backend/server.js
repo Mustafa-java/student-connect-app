@@ -1059,7 +1059,7 @@ app.get('/api/projects/:id/zip-file', authMiddleware, async (req, res) => {
     }
 
     const fileStats = fs.statSync(filePath);
-    console.log('Found file:', diskName, 'Size:', fileStats.size, 'bytes');
+    console.log('Found file:', project.zip_file_disk_name, 'Size:', fileStats.size, 'bytes');
     console.log('Original name:', project.zip_file_name);
 
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(project.zip_file_name)}"`);
