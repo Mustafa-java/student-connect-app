@@ -1,6 +1,7 @@
 require('dotenv').config();
 
 const express = require('express');
+const https = require('https');
 const cors = require('cors');
 const multer = require('multer');
 const fs = require('fs');
@@ -1025,9 +1026,27 @@ app.get('/api/projects/:id/zip-file', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'ZIP файл не прикреплён' });
     }
 
-    // Если файл в R2 — редиректим
+    // Файл в облаке (Cloudinary) — проксируем через сервер
     if (project.zip_file_url.startsWith('http')) {
-      return res.redirect(project.zip_file_url);
+      console.log('Proxying Cloudinary file:', project.zip_file_url);
+      try {
+          https.get(project.zip_file_url, (cloudRes) => {
+          if (cloudRes.statusCode !== 200) {
+            console.error('Cloudinary returned status:', cloudRes.statusCode);
+            return res.status(502).json({ error: 'Ошибка загрузки файла из Cloudinary' });
+          }
+          res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(project.zip_file_name)}"`);
+          res.setHeader('Content-Type', cloudRes.headers['content-type'] || 'application/zip');
+          cloudRes.pipe(res);
+        }).on('error', (err) => {
+          console.error('Cloudinary proxy error:', err);
+          res.status(502).json({ error: 'Ошибка соединения с Cloudinary' });
+        });
+      } catch (proxyErr) {
+        console.error('Proxy error:', proxyErr);
+        res.status(502).json({ error: 'Ошибка проксирования' });
+      }
+      return;
     }
 
     // Старый путь — локальный файл
