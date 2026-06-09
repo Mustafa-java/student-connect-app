@@ -1039,14 +1039,19 @@ app.get('/api/projects/:id/zip-file', authMiddleware, async (req, res) => {
     }
 
     const project = projectResult.rows[0];
-    const diskName = project.zip_file_disk_name;
-    if (!diskName || !project.zip_file_name) {
+    if (!project.zip_file_name || (!project.zip_file_disk_name && !project.zip_file_url)) {
       console.log('No zip file attached for project:', id);
       return res.status(404).json({ error: 'ZIP файл не прикреплён' });
     }
 
-    const filePath = path.join(UPLOADS_DIR, diskName);
-    console.log('Looking for file:', diskName);
+    // Если нет локального файла — редирект на zip_file_url (старые загрузки)
+    if (!project.zip_file_disk_name && project.zip_file_url) {
+      console.log('Redirecting to old zip URL:', project.zip_file_url);
+      return res.redirect(302, project.zip_file_url);
+    }
+
+    const filePath = path.join(UPLOADS_DIR, project.zip_file_disk_name);
+    console.log('Looking for file:', project.zip_file_disk_name);
 
     if (!fs.existsSync(filePath)) {
       console.log('File not found on disk:', filePath);
