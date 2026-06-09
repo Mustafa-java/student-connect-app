@@ -47,6 +47,7 @@ function parseParticipantIds(participantIds) {
 }
 
 // Создаём папку uploads если нет
+// Временная папка для multer (файлы удаляются после загрузки в Cloudinary)
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
 if (!fs.existsSync(UPLOADS_DIR)) {
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
@@ -74,7 +75,7 @@ const upload = multer({
   }
 });
 
-// Настройка multer для изображений постов
+// Настройка multer для изображений/видео постов
 const imageStorage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, UPLOADS_DIR),
   filename: (req, file, cb) => {
@@ -406,10 +407,12 @@ app.post('/api/posts', authMiddleware, postUpload.fields([
     const imageFiles = uploadedFiles['images'] || [];
     const videoFiles = uploadedFiles['video'] || [];
 
-    // Загружаем изображения в R2
-    const imageUrls = await Promise.all(
-      imageFiles.map((file, i) => cloudinary.uploadImage(file.path, id, i))
-    );
+    // Загружаем изображения последовательно (избегаем rate limit Cloudinary)
+    const imageUrls = [];
+    for (let i = 0; i < imageFiles.length; i++) {
+      const url = await cloudinary.uploadImage(imageFiles[i].path, id, i);
+      imageUrls.push(url);
+    }
 
     // Загружаем видео в R2
     let videoUrl = null;
@@ -420,9 +423,9 @@ app.post('/api/posts', authMiddleware, postUpload.fields([
     }
 
     // Удаляем временные файлы
-    [...imageFiles, ...videoFiles].forEach(f => {
-      fs.unlink(f.path, () => {});
-    });
+    for (const f of [...imageFiles, ...videoFiles]) {
+      try { fs.unlinkSync(f.path); } catch (_) {}
+    }
 
     // Парсим tags если это строка
     let tagsArray = [];
@@ -985,9 +988,9 @@ app.post('/api/projects/:id/upload-zip', authMiddleware, upload.single('file'), 
     const zipName = req.file.originalname;
     const zipSize = req.file.size;
 
-    fs.unlink(req.file.path, () => {});
+    try { fs.unlinkSync(req.file.path); } catch (_) {}
 
-    console.log('Uploaded zip to R2:', { originalName: zipName, size: zipSize, url: zipUrl });
+    console.log('Uploaded zip to Cloudinary:', { originalName: zipName, size: zipSize, url: zipUrl });
 
     await pool.query(
       'UPDATE projects SET zip_file_url = $1, zip_file_name = $2, zip_file_size = $3 WHERE id = $4',

@@ -129,16 +129,26 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
       );
     } catch (e) {
       debugPrint('createPost API error: $e');
+      if (!mounted) return;
+      setState(() => _isPosting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text('Ошибка публикации: ${e.toString()}'),
+            backgroundColor: AppColors.error),
+      );
+      return;
     }
 
     if (!mounted) return;
     setState(() => _isPosting = false);
 
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
           content: Text('Пост опубликован!'),
           backgroundColor: AppColors.success),
     );
+    if (!mounted) return;
     Navigator.pop(context);
   }
 

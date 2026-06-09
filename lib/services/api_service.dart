@@ -32,8 +32,9 @@ class ApiService {
   Future<void> init() async {
     _dio = Dio(BaseOptions(
       baseUrl: _baseUrl,
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 10),
+      connectTimeout: const Duration(seconds: 15),
+      receiveTimeout: const Duration(seconds: 20),
+      sendTimeout: const Duration(seconds: 30),
       headers: {'Content-Type': 'application/json'},
       validateStatus: (status) => status != null && status < 500,
     ));
@@ -434,6 +435,8 @@ class ApiService {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        sendTimeout: const Duration(seconds: 120),
+        receiveTimeout: const Duration(seconds: 120),
       ),
     );
     final data = response.data as Map<String, dynamic>;
@@ -604,6 +607,10 @@ class ApiService {
     final response = await _dio.post(
       '/api/projects/$projectId/upload-zip',
       data: formData,
+      options: Options(
+        sendTimeout: const Duration(seconds: 120),
+        receiveTimeout: const Duration(seconds: 120),
+      ),
     );
     return response.data as Map<String, dynamic>;
   }

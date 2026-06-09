@@ -18,33 +18,54 @@ cloudinary.config({
 
 const FOLDER = 'student-connect';
 
+async function withRetry(fn, maxRetries = 3) {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      const isLast = i === maxRetries - 1;
+      if (isLast) throw err;
+      console.warn(`Cloudinary retry ${i + 1}/${maxRetries}: ${err.message}`);
+      await new Promise(r => setTimeout(r, 1000 * (i + 1)));
+    }
+  }
+}
+
 async function uploadImage(filePath, postId, index) {
   if (!isConfigured) throw new Error('Cloudinary not configured');
-  const result = await cloudinary.uploader.upload(filePath, {
-    folder: `${FOLDER}/posts`,
-    public_id: `${postId}/image_${index}`,
-    resource_type: 'image',
-  });
+  const result = await withRetry(() =>
+    cloudinary.uploader.upload(filePath, {
+      folder: `${FOLDER}/posts`,
+      public_id: `${postId}/image_${index}`,
+      resource_type: 'image',
+    })
+  );
   return result.secure_url;
 }
 
 async function uploadVideo(filePath, postId) {
   if (!isConfigured) throw new Error('Cloudinary not configured');
-  const result = await cloudinary.uploader.upload(filePath, {
-    folder: `${FOLDER}/posts`,
-    public_id: `${postId}/video`,
-    resource_type: 'video',
-  });
+  const result = await withRetry(() =>
+    cloudinary.uploader.upload(filePath, {
+      folder: `${FOLDER}/posts`,
+      public_id: `${postId}/video`,
+      resource_type: 'video',
+      timeout: 60000,
+    })
+  );
   return result.secure_url;
 }
 
 async function uploadZip(filePath, projectId, index) {
   if (!isConfigured) throw new Error('Cloudinary not configured');
-  const result = await cloudinary.uploader.upload(filePath, {
-    folder: `${FOLDER}/projects`,
-    public_id: `${projectId}/file_${index}`,
-    resource_type: 'raw',
-  });
+  const result = await withRetry(() =>
+    cloudinary.uploader.upload(filePath, {
+      folder: `${FOLDER}/projects`,
+      public_id: `${projectId}/file_${index}`,
+      resource_type: 'raw',
+      timeout: 60000,
+    })
+  );
   return result.secure_url;
 }
 
