@@ -12,12 +12,14 @@ class ProjectDownloadDialog extends StatefulWidget {
   final String projectId;
   final String fileName;
   final String fileSize;
+  final String? downloadUrl;
 
   const ProjectDownloadDialog({
     super.key,
     required this.projectId,
     required this.fileName,
     required this.fileSize,
+    this.downloadUrl,
   });
 
   @override
@@ -78,6 +80,7 @@ class _ProjectDownloadDialogState extends State<ProjectDownloadDialog> {
       final downloadPath = await ApiService.instance.downloadProjectZipFile(
         projectId: widget.projectId,
         fileName: widget.fileName,
+        directUrl: widget.downloadUrl,
         onProgress: (received, total) {
           if (mounted) {
             setState(() {
@@ -319,6 +322,7 @@ Future<String?> showProjectDownloadDialog({
   required String projectId,
   required String fileName,
   required String fileSize,
+  String? downloadUrl,
 }) {
   return showDialog<String>(
     context: context,
@@ -327,6 +331,7 @@ Future<String?> showProjectDownloadDialog({
       projectId: projectId,
       fileName: fileName,
       fileSize: fileSize,
+      downloadUrl: downloadUrl,
     ),
   );
 }

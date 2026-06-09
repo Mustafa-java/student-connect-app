@@ -64,6 +64,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       projectId: _project.id,
       fileName: _project.zipFileName ?? 'Файл проекта',
       fileSize: _project.zipFileSizeFormatted,
+      downloadUrl: _project.zipFileUrl,
     );
 
     if (result != null && mounted) {

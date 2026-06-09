@@ -628,10 +628,11 @@ class ApiService {
   Future<String?> downloadProjectZipFile({
     required String projectId,
     required String fileName,
+    String? directUrl,
     required void Function(int received, int total) onProgress,
   }) async {
     try {
-      final url = '$_baseUrl/api/projects/$projectId/zip-file';
+      final url = directUrl ?? '$_baseUrl/api/projects/$projectId/zip-file';
       debugPrint('Downloading ZIP file from: $url');
 
       // Сохраняем в публичную папку Downloads
