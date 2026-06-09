@@ -9,7 +9,7 @@ const { v4: uuidv4 } = require('uuid');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { pool, initDatabase } = require('./database');
-const storage = require('./r2-storage');
+const cloudinary = require('./cloudinary');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -408,15 +408,15 @@ app.post('/api/posts', authMiddleware, postUpload.fields([
 
     // Загружаем изображения в R2
     const imageUrls = await Promise.all(
-      imageFiles.map((file, i) => storage.uploadImage(file.path, id, i))
+      imageFiles.map((file, i) => cloudinary.uploadImage(file.path, id, i))
     );
 
     // Загружаем видео в R2
     let videoUrl = null;
     let videoThumbnailUrl = null;
     if (videoFiles.length > 0) {
-      videoUrl = await storage.uploadVideo(videoFiles[0].path, id);
-      videoThumbnailUrl = storage.getVideoThumbnailUrl(videoUrl);
+      videoUrl = await cloudinary.uploadVideo(videoFiles[0].path, id);
+      videoThumbnailUrl = cloudinary.getVideoThumbnailUrl(videoUrl);
     }
 
     // Удаляем временные файлы
@@ -510,7 +510,7 @@ app.delete('/api/posts/:id', authMiddleware, async (req, res) => {
     }
 
     // Удаляем файлы из R2
-    await storage.deletePostFiles(id);
+    await cloudinary.deletePostFiles(id);
 
     await pool.query('DELETE FROM post_likes WHERE post_id = $1', [id]);
     await pool.query('DELETE FROM comments WHERE post_id = $1', [id]);
@@ -863,7 +863,7 @@ app.delete('/api/projects/:id', authMiddleware, async (req, res) => {
     }
 
     // Удаляем файлы из R2
-    await storage.deleteProjectFiles(id);
+    await cloudinary.deleteProjectFiles(id);
 
     await pool.query('DELETE FROM project_likes WHERE project_id = $1', [id]);
 
@@ -981,7 +981,7 @@ app.post('/api/projects/:id/upload-zip', authMiddleware, upload.single('file'), 
       return res.status(403).json({ error: 'Нет доступа' });
     }
 
-    const zipUrl = await storage.uploadFileAsZip(req.file.path, id, 0);
+    const zipUrl = await cloudinary.uploadZip(req.file.path, id, 0);
     const zipName = req.file.originalname;
     const zipSize = req.file.size;
 
