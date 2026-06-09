@@ -1008,13 +1008,16 @@ app.post('/api/projects/:id/upload-zip', authMiddleware, upload.single('file'), 
 
     console.log('Saved zip locally:', { originalName: zipName, size: zipSize, diskName });
 
+    const baseUrl = getBaseUrl(req);
+    const downloadUrl = `${baseUrl}/api/projects/${id}/zip-file`;
+
     await pool.query(
       'UPDATE projects SET zip_file_url = $1, zip_file_name = $2, zip_file_size = $3, zip_file_disk_name = $4 WHERE id = $5',
-      [null, zipName, zipSize, diskName, id]
+      [downloadUrl, zipName, zipSize, diskName, id]
     );
 
     res.json({
-      zip_file_url: null,
+      zip_file_url: downloadUrl,
       zip_file_name: zipName,
       zip_file_size: zipSize
     });
