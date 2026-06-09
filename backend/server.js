@@ -9,17 +9,7 @@ const { v4: uuidv4 } = require('uuid');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { pool, initDatabase } = require('./database');
-
-// ffmpeg для превью видео — graceful fallback
-let ffmpeg = null;
-try {
-  const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
-  ffmpeg = require('fluent-ffmpeg');
-  ffmpeg.setFfmpegPath(ffmpegPath);
-  console.log('✅ ffmpeg loaded for video thumbnails');
-} catch (e) {
-  console.warn('⚠️ ffmpeg not available, video thumbnails disabled:', e.message);
-}
+const cloudinary = require('./cloudinary');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -28,26 +18,6 @@ const JWT_SECRET = process.env.JWT_SECRET || 'student-connect-secret-key';
 // Получить базовый URL сервера
 function getBaseUrl(req) {
   return `${req.protocol}://${req.get('host')}`;
-}
-
-// Сгенерировать превью для видео
-function generateVideoThumbnail(videoPath) {
-  return new Promise((resolve) => {
-    if (!ffmpeg) return resolve(null);
-    const thumbName = `thumb_${path.basename(videoPath, path.extname(videoPath))}.jpg`;
-    ffmpeg(videoPath)
-      .screenshots({
-        timestamps: ['0.5'],
-        filename: thumbName,
-        folder: UPLOADS_DIR,
-        size: '480x?',
-      })
-      .on('end', () => resolve(thumbName))
-      .on('error', (err) => {
-        console.error('Thumbnail error:', err.message);
-        resolve(null);
-      });
-  });
 }
 
 // Конвертировать пути изображений в полные URL
@@ -436,19 +406,23 @@ app.post('/api/posts', authMiddleware, postUpload.fields([
     const imageFiles = uploadedFiles['images'] || [];
     const videoFiles = uploadedFiles['video'] || [];
 
-    // Получаем URL загруженных изображений
-    const imageUrls = imageFiles.map(file => `/uploads/${file.filename}`);
+    // Загружаем изображения в Cloudinary
+    const imageUrls = await Promise.all(
+      imageFiles.map((file, i) => cloudinary.uploadImage(file.path, id, i))
+    );
 
-    // Получаем URL видео если загружено
+    // Загружаем видео в Cloudinary
     let videoUrl = null;
     let videoThumbnailUrl = null;
     if (videoFiles.length > 0) {
-      videoUrl = `/uploads/${videoFiles[0].filename}`;
-      const thumbName = await generateVideoThumbnail(videoFiles[0].path);
-      if (thumbName) {
-        videoThumbnailUrl = `/uploads/${thumbName}`;
-      }
+      videoUrl = await cloudinary.uploadVideo(videoFiles[0].path, id);
+      videoThumbnailUrl = cloudinary.getVideoThumbnailUrl(videoUrl);
     }
+
+    // Удаляем временные файлы
+    [...imageFiles, ...videoFiles].forEach(f => {
+      fs.unlink(f.path, () => {});
+    });
 
     // Парсим tags если это строка
     let tagsArray = [];
@@ -480,16 +454,15 @@ app.post('/api/posts', authMiddleware, postUpload.fields([
       FROM posts p JOIN users u ON p.author_id = u.id WHERE p.id = $1
     `, [id]);
 
-    const baseUrl = getBaseUrl(req);
     const post = result.rows[0];
-    post.images = JSON.stringify(convertImageUrls(post.images, baseUrl));
-    if (post.video_url) post.video_url = post.video_url.startsWith('/uploads/') ? `${baseUrl}${post.video_url}` : post.video_url;
-    if (post.video_thumbnail_url) post.video_thumbnail_url = post.video_thumbnail_url.startsWith('/uploads/') ? `${baseUrl}${post.video_thumbnail_url}` : post.video_thumbnail_url;
+    post.images = JSON.stringify(imageUrls);
+    post.video_url = videoUrl;
+    post.video_thumbnail_url = videoThumbnailUrl;
     post.author_skills = JSON.parse(post.author_skills || '[]');
     post.is_liked = await enrichPost(post.id, req.userId);
     post.is_saved = await enrichPostSaved(post.id, req.userId);
 
-    console.log('Post created with images:', imageUrls, 'video:', videoUrl);
+    console.log('Post created with images:', imageUrls.length, 'video:', !!videoUrl);
     res.status(201).json({ post });
   } catch(e) {
     console.error('Create post error:', e);
@@ -535,6 +508,9 @@ app.delete('/api/posts/:id', authMiddleware, async (req, res) => {
     if (postResult.rows[0].author_id !== req.userId) {
       return res.status(403).json({ error: 'Нет доступа' });
     }
+
+    // Удаляем файлы из Cloudinary
+    await cloudinary.deletePostFiles(id);
 
     await pool.query('DELETE FROM post_likes WHERE post_id = $1', [id]);
     await pool.query('DELETE FROM comments WHERE post_id = $1', [id]);
