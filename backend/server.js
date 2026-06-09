@@ -986,6 +986,8 @@ app.post('/api/projects/:id/upload-zip', authMiddleware, upload.single('file'), 
     }
 
     // Сохраняем файл локально на сервере
+    console.log('Multer saved file:', { path: req.file.path, size: req.file.size, name: req.file.originalname });
+
     const diskName = `${id}_${Date.now()}${path.extname(req.file.originalname)}`;
     const destPath = path.join(UPLOADS_DIR, diskName);
 
@@ -996,9 +998,13 @@ app.post('/api/projects/:id/upload-zip', authMiddleware, upload.single('file'), 
       try { fs.unlinkSync(oldPath); } catch (_) {}
     }
 
-    fs.renameSync(req.file.path, destPath);
+    // Копируем (работает и на разных файловых системах)
+    fs.copyFileSync(req.file.path, destPath);
+    try { fs.unlinkSync(req.file.path); } catch (_) {}
+
+    const destStat = fs.statSync(destPath);
     const zipName = req.file.originalname;
-    const zipSize = req.file.size;
+    const zipSize = destStat.size;
 
     console.log('Saved zip locally:', { originalName: zipName, size: zipSize, diskName });
 
