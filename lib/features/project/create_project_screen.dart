@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/utils/helpers.dart';
 import '../../providers/app_providers.dart';
 import '../../models/models.dart';
 import '../../services/api_service.dart';
@@ -69,6 +70,20 @@ class _CreateProjectScreenState extends ConsumerState<CreateProjectScreen> {
       if (result != null && result.files.isNotEmpty) {
         final file = result.files.first;
         if (file.path != null) {
+          if (file.size > AppConstants.maxZipFileSize) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Файл слишком большой (${formatFileSize(file.size)}). '
+                    'Максимум ${formatFileSize(AppConstants.maxZipFileSize)}',
+                  ),
+                  backgroundColor: AppColors.error,
+                ),
+              );
+            }
+            return;
+          }
           setState(() {
             _zipFile = File(file.path!);
             _zipFileName = file.name;
@@ -380,7 +395,7 @@ class _CreateProjectScreenState extends ConsumerState<CreateProjectScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _zipFileName ?? 'ZIP файл',
+                          '${_zipFileName ?? 'ZIP файл'} (${formatFileSize(_zipFileSize ?? 0)})',
                           style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,

@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/utils/helpers.dart';
 import '../../providers/app_providers.dart';
 import '../../models/models.dart';
 import '../../services/api_service.dart';
@@ -60,9 +61,24 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
   Future<void> _pickVideo() async {
     final video = await _picker.pickVideo(
       source: ImageSource.gallery,
-      maxDuration: const Duration(seconds: 60),
+      maxDuration: const Duration(seconds: AppConstants.maxVideoDurationSeconds),
     );
     if (video != null) {
+      final file = File(video.path);
+      final size = await file.length();
+      if (size > AppConstants.maxPostVideoSize) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Видео слишком большое (${formatFileSize(size)}). '
+              'Максимум ${formatFileSize(AppConstants.maxPostVideoSize)}',
+            ),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        return;
+      }
       setState(() => _video = video);
     }
   }
@@ -236,9 +252,24 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                               color: Colors.black,
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: const Center(
-                              child: Icon(Icons.play_circle_fill,
-                                  size: 40, color: Colors.white70),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.play_circle_fill,
+                                    size: 32, color: Colors.white70),
+                                const SizedBox(height: 4),
+                                FutureBuilder<int>(
+                                  future: File(_video!.path).length(),
+                                  builder: (_, snap) {
+                                    final size = snap.data ?? 0;
+                                    return Text(
+                                      formatFileSize(size),
+                                      style: const TextStyle(
+                                          fontSize: 10, color: Colors.white54),
+                                    );
+                                  },
+                                ),
+                              ],
                             ),
                           ),
                           Positioned(
