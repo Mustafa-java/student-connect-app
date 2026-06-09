@@ -985,21 +985,30 @@ app.post('/api/projects/:id/upload-zip', authMiddleware, upload.single('file'), 
       return res.status(403).json({ error: 'Нет доступа' });
     }
 
-    const zipUrl = await cloudinary.uploadZip(req.file.path, id, 0);
+    // Сохраняем файл локально на сервере
+    const diskName = `${id}_${Date.now()}${path.extname(req.file.originalname)}`;
+    const destPath = path.join(UPLOADS_DIR, diskName);
+
+    // Удаляем старый ZIP если был
+    const oldZip = projectResult.rows[0].zip_file_disk_name;
+    if (oldZip) {
+      const oldPath = path.join(UPLOADS_DIR, oldZip);
+      try { fs.unlinkSync(oldPath); } catch (_) {}
+    }
+
+    fs.renameSync(req.file.path, destPath);
     const zipName = req.file.originalname;
     const zipSize = req.file.size;
 
-    try { fs.unlinkSync(req.file.path); } catch (_) {}
-
-    console.log('Uploaded zip to Cloudinary:', { originalName: zipName, size: zipSize, url: zipUrl });
+    console.log('Saved zip locally:', { originalName: zipName, size: zipSize, diskName });
 
     await pool.query(
-      'UPDATE projects SET zip_file_url = $1, zip_file_name = $2, zip_file_size = $3 WHERE id = $4',
-      [zipUrl, zipName, zipSize, id]
+      'UPDATE projects SET zip_file_url = $1, zip_file_name = $2, zip_file_size = $3, zip_file_disk_name = $4 WHERE id = $5',
+      [null, zipName, zipSize, diskName, id]
     );
 
     res.json({
-      zip_file_url: zipUrl,
+      zip_file_url: null,
       zip_file_name: zipName,
       zip_file_size: zipSize
     });
@@ -1026,58 +1035,15 @@ app.get('/api/projects/:id/zip-file', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'ZIP файл не прикреплён' });
     }
 
-    // Файл в облаке (Cloudinary) — проксируем через сервер
-    if (project.zip_file_url.startsWith('http')) {
-      console.log('Proxying Cloudinary file:', project.zip_file_url);
-
-      // Cloudinary raw URL может не работать напрямую, пробуем альтернативные форматы
-      const urlsToTry = [
-        project.zip_file_url,
-        // Без расширения .zip
-        project.zip_file_url.replace(/\.zip$/, ''),
-        // С флагом fl_attachment
-        project.zip_file_url.replace('/raw/upload/', '/raw/upload/fl_attachment/'),
-        // Через image upload endpoint (для raw файлов)
-        project.zip_file_url.replace('/raw/upload/', '/image/upload/fl_attachment/'),
-      ];
-
-      let downloaded = false;
-      for (const tryUrl of urlsToTry) {
-        if (downloaded) break;
-        try {
-          await new Promise((resolve, reject) => {
-            https.get(tryUrl, { timeout: 15000 }, (cloudRes) => {
-              const contentType = cloudRes.headers['content-type'] || '';
-              if (cloudRes.statusCode === 200 && !contentType.includes('image/gif')) {
-                res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(project.zip_file_name)}"`);
-                res.setHeader('Content-Type', contentType || 'application/zip');
-                cloudRes.pipe(res);
-                downloaded = true;
-                resolve();
-              } else {
-                // Пробуем следующий URL
-                cloudRes.resume();
-                reject(new Error(`Cloudinary returned ${cloudRes.statusCode} (${contentType})`));
-              }
-            }).on('error', reject);
-          });
-        } catch (e) {
-          console.warn(`Cloudinary URL ${tryUrl} failed:`, e.message);
-        }
-      }
-
-      if (!downloaded) {
-        console.error('All Cloudinary URLs failed');
-        return res.status(502).json({ error: 'Файл не найден в Cloudinary' });
-      }
-      return;
+    // Файл на сервере (локальное хранение)
+    const diskName = project.zip_file_disk_name;
+    if (!diskName) {
+      console.log('No disk name for zip:', id);
+      return res.status(404).json({ error: 'Файл не найден' });
     }
 
-    // Старый путь — локальный файл
-    const zipFileName = project.zip_file_disk_name || project.zip_file_name;
-    const filePath = path.join(UPLOADS_DIR, zipFileName);
-
-    console.log('Looking for file:', zipFileName);
+    const filePath = path.join(UPLOADS_DIR, diskName);
+    console.log('Looking for file:', diskName);
 
     if (!fs.existsSync(filePath)) {
       console.log('File not found on disk:', filePath);
@@ -1085,7 +1051,7 @@ app.get('/api/projects/:id/zip-file', authMiddleware, async (req, res) => {
     }
 
     const fileStats = fs.statSync(filePath);
-    console.log('Found file:', zipFileName, 'Size:', fileStats.size, 'bytes');
+    console.log('Found file:', diskName, 'Size:', fileStats.size, 'bytes');
     console.log('Original name:', project.zip_file_name);
 
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(project.zip_file_name)}"`);
