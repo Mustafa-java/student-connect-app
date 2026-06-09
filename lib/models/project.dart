@@ -213,7 +213,7 @@ class Project extends Equatable {
   }
 
   /// Есть ли прикрепленный ZIP файл
-  bool get hasZipFile => zipFileUrl != null && zipFileName != null;
+  bool get hasZipFile => zipFileName != null && zipFileSize != null && zipFileSize > 0;
 
   /// Форматированный размер файла
   String get zipFileSizeFormatted {
