@@ -9,7 +9,7 @@ const { v4: uuidv4 } = require('uuid');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { pool, initDatabase } = require('./database');
-const cloudinary = require('./cloudinary');
+const storage = require('./r2-storage');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -406,17 +406,17 @@ app.post('/api/posts', authMiddleware, postUpload.fields([
     const imageFiles = uploadedFiles['images'] || [];
     const videoFiles = uploadedFiles['video'] || [];
 
-    // Загружаем изображения в Cloudinary
+    // Загружаем изображения в R2
     const imageUrls = await Promise.all(
-      imageFiles.map((file, i) => cloudinary.uploadImage(file.path, id, i))
+      imageFiles.map((file, i) => storage.uploadImage(file.path, id, i))
     );
 
-    // Загружаем видео в Cloudinary
+    // Загружаем видео в R2
     let videoUrl = null;
     let videoThumbnailUrl = null;
     if (videoFiles.length > 0) {
-      videoUrl = await cloudinary.uploadVideo(videoFiles[0].path, id);
-      videoThumbnailUrl = cloudinary.getVideoThumbnailUrl(videoUrl);
+      videoUrl = await storage.uploadVideo(videoFiles[0].path, id);
+      videoThumbnailUrl = storage.getVideoThumbnailUrl(videoUrl);
     }
 
     // Удаляем временные файлы
@@ -509,8 +509,8 @@ app.delete('/api/posts/:id', authMiddleware, async (req, res) => {
       return res.status(403).json({ error: 'Нет доступа' });
     }
 
-    // Удаляем файлы из Cloudinary
-    await cloudinary.deletePostFiles(id);
+    // Удаляем файлы из R2
+    await storage.deletePostFiles(id);
 
     await pool.query('DELETE FROM post_likes WHERE post_id = $1', [id]);
     await pool.query('DELETE FROM comments WHERE post_id = $1', [id]);
@@ -862,6 +862,9 @@ app.delete('/api/projects/:id', authMiddleware, async (req, res) => {
       return res.status(403).json({ error: 'Нет доступа' });
     }
 
+    // Удаляем файлы из R2
+    await storage.deleteProjectFiles(id);
+
     await pool.query('DELETE FROM project_likes WHERE project_id = $1', [id]);
 
     if (project.zip_file_disk_name) {
@@ -978,20 +981,17 @@ app.post('/api/projects/:id/upload-zip', authMiddleware, upload.single('file'), 
       return res.status(403).json({ error: 'Нет доступа' });
     }
 
-    const zipUrl = `/api/projects/${id}/zip-file`;
+    const zipUrl = await storage.uploadFileAsZip(req.file.path, id, 0);
     const zipName = req.file.originalname;
     const zipSize = req.file.size;
-    const zipFileNameOnDisk = req.file.filename;
 
-    console.log('Uploaded file:', {
-      originalName: zipName,
-      diskName: zipFileNameOnDisk,
-      size: zipSize
-    });
+    fs.unlink(req.file.path, () => {});
+
+    console.log('Uploaded zip to R2:', { originalName: zipName, size: zipSize, url: zipUrl });
 
     await pool.query(
-      'UPDATE projects SET zip_file_url = $1, zip_file_name = $2, zip_file_size = $3, zip_file_disk_name = $4 WHERE id = $5',
-      [zipUrl, zipName, zipSize, zipFileNameOnDisk, id]
+      'UPDATE projects SET zip_file_url = $1, zip_file_name = $2, zip_file_size = $3 WHERE id = $4',
+      [zipUrl, zipName, zipSize, id]
     );
 
     res.json({
@@ -1022,6 +1022,12 @@ app.get('/api/projects/:id/zip-file', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'ZIP файл не прикреплён' });
     }
 
+    // Если файл в R2 — редиректим
+    if (project.zip_file_url.startsWith('http')) {
+      return res.redirect(project.zip_file_url);
+    }
+
+    // Старый путь — локальный файл
     const zipFileName = project.zip_file_disk_name || project.zip_file_name;
     const filePath = path.join(UPLOADS_DIR, zipFileName);
 
