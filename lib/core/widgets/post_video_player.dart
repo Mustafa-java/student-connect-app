@@ -5,12 +5,16 @@ import '../theme/app_colors.dart';
 /// Виджет для проигрывания видео в постах
 class PostVideoPlayer extends StatefulWidget {
   final String videoUrl;
+  final String? thumbnailUrl;
   final double? height;
+  final bool autoPlay;
 
   const PostVideoPlayer({
     super.key,
     required this.videoUrl,
+    this.thumbnailUrl,
     this.height,
+    this.autoPlay = false,
   });
 
   @override
@@ -21,14 +25,15 @@ class _PostVideoPlayerState extends State<PostVideoPlayer> {
   VideoPlayerController? _controller;
   bool _isInitialized = false;
   bool _hasError = false;
+  bool _showPlayer = false;
 
   @override
   void initState() {
     super.initState();
-    _initController();
+    if (widget.autoPlay) _initController(autoPlay: true);
   }
 
-  void _initController() {
+  void _initController({bool autoPlay = false}) {
     try {
       final uri = Uri.tryParse(widget.videoUrl);
       if (uri == null || !uri.hasScheme || widget.videoUrl.isEmpty) {
@@ -42,7 +47,7 @@ class _PostVideoPlayerState extends State<PostVideoPlayer> {
             setState(() => _isInitialized = true);
             _controller!.setLooping(true);
             _controller!.setVolume(0);
-            _controller!.play();
+            if (autoPlay) _controller!.play();
           }
         }).catchError((error) {
           debugPrint('VideoPlayer init error: $error');
@@ -67,6 +72,12 @@ class _PostVideoPlayerState extends State<PostVideoPlayer> {
   void dispose() {
     _controller?.dispose();
     super.dispose();
+  }
+
+  void _play() {
+    if (!mounted) return;
+    setState(() => _showPlayer = true);
+    if (_controller == null) _initController(autoPlay: true);
   }
 
   void _togglePlay() {
@@ -99,6 +110,44 @@ class _PostVideoPlayerState extends State<PostVideoPlayer> {
               ),
             ],
           ),
+        ),
+      );
+    }
+
+    if (!_showPlayer) {
+      // Показываем превью (thumbnail) с кнопкой play
+      return GestureDetector(
+        onTap: _play,
+        child: Stack(
+          fit: StackFit.passthrough,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.network(
+                widget.thumbnailUrl ?? widget.videoUrl,
+                height: height,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  height: height,
+                  color: Colors.black26,
+                  child: const Icon(Icons.play_circle_outline,
+                      size: 48, color: Colors.white38),
+                ),
+              ),
+            ),
+            Container(
+              height: height,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                color: Colors.black12,
+              ),
+              child: const Center(
+                child: Icon(Icons.play_circle_fill_rounded,
+                    size: 56, color: Colors.white70),
+              ),
+            ),
+          ],
         ),
       );
     }

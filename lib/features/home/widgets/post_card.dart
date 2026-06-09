@@ -432,7 +432,11 @@ class _PostCardState extends State<PostCard>
     return Column(
       children: [
         if (hasVideo)
-          PostVideoPlayer(videoUrl: post.videoUrl!),
+          PostVideoPlayer(
+            videoUrl: post.videoUrl!,
+            thumbnailUrl: post.videoThumbnailUrl,
+            autoPlay: true,
+          ),
         if (images.isNotEmpty)
           CarouselSlider(
             options: CarouselOptions(

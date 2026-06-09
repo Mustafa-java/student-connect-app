@@ -442,7 +442,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
               if (post.videoUrl != null && post.videoUrl!.isNotEmpty)
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
-                  child: PostVideoPlayer(videoUrl: post.videoUrl!, height: 180),
+                  child: PostVideoPlayer(
+                    videoUrl: post.videoUrl!,
+                    thumbnailUrl: post.videoThumbnailUrl,
+                    height: 180,
+                  ),
                 )
               else if (post.images.isNotEmpty)
                 SmartImage(

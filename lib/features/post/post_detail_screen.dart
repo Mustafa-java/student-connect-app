@@ -683,7 +683,11 @@ ${contentPreview.isNotEmpty ? '\n$contentPreview' : ''}
     return Column(
       children: [
         if (post.videoUrl != null && post.videoUrl!.isNotEmpty)
-          PostVideoPlayer(videoUrl: post.videoUrl!),
+          PostVideoPlayer(
+            videoUrl: post.videoUrl!,
+            thumbnailUrl: post.videoThumbnailUrl,
+            autoPlay: true,
+          ),
         if (images.isNotEmpty)
           Stack(
             children: [
