@@ -1026,10 +1026,51 @@ app.get('/api/projects/:id/zip-file', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'ZIP файл не прикреплён' });
     }
 
-    // Файл в облаке (Cloudinary) — редиректим напрямую (Flutter Dio умеет followRedirects)
+    // Файл в облаке (Cloudinary) — проксируем через сервер
     if (project.zip_file_url.startsWith('http')) {
-      console.log('Redirecting to Cloudinary:', project.zip_file_url);
-      return res.redirect(302, project.zip_file_url);
+      console.log('Proxying Cloudinary file:', project.zip_file_url);
+
+      // Cloudinary raw URL может не работать напрямую, пробуем альтернативные форматы
+      const urlsToTry = [
+        project.zip_file_url,
+        // Без расширения .zip
+        project.zip_file_url.replace(/\.zip$/, ''),
+        // С флагом fl_attachment
+        project.zip_file_url.replace('/raw/upload/', '/raw/upload/fl_attachment/'),
+        // Через image upload endpoint (для raw файлов)
+        project.zip_file_url.replace('/raw/upload/', '/image/upload/fl_attachment/'),
+      ];
+
+      let downloaded = false;
+      for (const tryUrl of urlsToTry) {
+        if (downloaded) break;
+        try {
+          await new Promise((resolve, reject) => {
+            https.get(tryUrl, { timeout: 15000 }, (cloudRes) => {
+              const contentType = cloudRes.headers['content-type'] || '';
+              if (cloudRes.statusCode === 200 && !contentType.includes('image/gif')) {
+                res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(project.zip_file_name)}"`);
+                res.setHeader('Content-Type', contentType || 'application/zip');
+                cloudRes.pipe(res);
+                downloaded = true;
+                resolve();
+              } else {
+                // Пробуем следующий URL
+                cloudRes.resume();
+                reject(new Error(`Cloudinary returned ${cloudRes.statusCode} (${contentType})`));
+              }
+            }).on('error', reject);
+          });
+        } catch (e) {
+          console.warn(`Cloudinary URL ${tryUrl} failed:`, e.message);
+        }
+      }
+
+      if (!downloaded) {
+        console.error('All Cloudinary URLs failed');
+        return res.status(502).json({ error: 'Файл не найден в Cloudinary' });
+      }
+      return;
     }
 
     // Старый путь — локальный файл

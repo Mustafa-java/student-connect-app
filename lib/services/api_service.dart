@@ -632,7 +632,8 @@ class ApiService {
     required void Function(int received, int total) onProgress,
   }) async {
     try {
-      final url = directUrl ?? '$_baseUrl/api/projects/$projectId/zip-file';
+      // Всегда через backend — он проксирует Cloudinary с правильными URL
+      final url = '$_baseUrl/api/projects/$projectId/zip-file';
       debugPrint('Downloading ZIP file from: $url');
 
       // Сохраняем в публичную папку Downloads
@@ -647,11 +648,11 @@ class ApiService {
 
       debugPrint('Saving to: $filePath');
 
-      // Используем Dio с правильными опциями для бинарных файлов
-      final response = await _dio.get<ResponseBody>(
+      // Пробуем скачать через Dio.download (сохраняет напрямую в файл)
+      await _dio.download(
         url,
+        filePath,
         options: Options(
-          responseType: ResponseType.stream,
           followRedirects: true,
           validateStatus: (status) => status != null && status < 500,
         ),
@@ -664,30 +665,7 @@ class ApiService {
         },
       );
 
-      // Проверяем что это не JSON ошибка
-      final contentType = response.headers.value('content-type') ?? '';
-      debugPrint('Content-Type: $contentType');
-
-      if (contentType.contains('application/json')) {
-        // Сервер вернул JSON (скорее всего ошибку)
-        final bytes = <int>[];
-        await for (final chunk in response.data!.stream) {
-          bytes.addAll(chunk);
-        }
-        final responseData = String.fromCharCodes(bytes);
-        debugPrint('Server returned JSON instead of file: $responseData');
-        throw Exception('Сервер вернул ошибку: $responseData');
-      }
-
-      // Записываем файл
-      final file = File(filePath);
-      final sink = file.openWrite();
-      await for (final chunk in response.data!.stream) {
-        sink.add(chunk);
-      }
-      await sink.close();
-
-      final fileSize = await file.length();
+      final fileSize = await File(filePath).length();
       debugPrint('File downloaded successfully: $fileSize bytes');
 
       if (fileSize == 0) {
