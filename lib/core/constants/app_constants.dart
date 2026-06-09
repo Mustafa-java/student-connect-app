@@ -17,6 +17,7 @@ class AppConstants {
 
   // Ограничения
   static const int maxProjectImages = 5;
+  static const int maxPostImages = 5;
   static const int maxAvatarSize = 5 * 1024 * 1024; // 5 MB
   static const int maxPostVideoSize = 20 * 1024 * 1024; // 20 MB (Cloudinary free tier)
   static const int maxZipFileSize = 20 * 1024 * 1024; // 20 MB

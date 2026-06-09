@@ -6,8 +6,6 @@ import 'package:path_provider/path_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/utils/helpers.dart';
-import '../../providers/app_providers.dart';
-import '../../models/models.dart';
 import '../../services/api_service.dart';
 
 /// Экран создания поста (не проекта!)
@@ -35,9 +33,9 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
 
   Future<void> _pickImages() async {
     final images = await _picker.pickMultiImage(
-      maxWidth: 1024,
-      maxHeight: 1024,
-      imageQuality: 85,
+      maxWidth: 800,
+      maxHeight: 800,
+      imageQuality: 80,
     );
     if (images.isNotEmpty) {
       final appDir = await getApplicationDocumentsDirectory();
@@ -50,8 +48,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
           i++) {
         final fileName = 'post_${DateTime.now().millisecondsSinceEpoch}_$i.jpg';
         final savedFile = File('${postsDir.path}/$fileName');
-        final bytes = await images[i].readAsBytes();
-        await savedFile.writeAsBytes(bytes);
+        await File(images[i].path).copy(savedFile.path);
         savedFiles.add(XFile(savedFile.path));
       }
       setState(() => _images.addAll(savedFiles));
@@ -79,7 +76,15 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
         );
         return;
       }
-      setState(() => _video = video);
+      // Копируем видео в постоянную папку, чтобы не зависеть от temp файла
+      final appDir = await getApplicationDocumentsDirectory();
+      final postsDir = Directory('${appDir.path}/posts');
+      if (!await postsDir.exists()) await postsDir.create(recursive: true);
+      final ext = video.path.split('.').last;
+      final fileName = 'video_${DateTime.now().millisecondsSinceEpoch}.$ext';
+      final savedFile = File('${postsDir.path}/$fileName');
+      await file.copy(savedFile.path);
+      setState(() => _video = XFile(savedFile.path));
     }
   }
 
@@ -102,39 +107,6 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
     }
 
     setState(() => _isPosting = true);
-
-    final user = ref.read(currentUserProvider);
-    if (user == null) return;
-
-    final authorId = user.id;
-    final postId = 'post_${DateTime.now().millisecondsSinceEpoch}';
-
-    final imagePaths = _images.map((x) => x.path).toList();
-
-    final postAuthor = User(
-      id: authorId,
-      name: user.name,
-      email: user.email,
-      avatarUrl: user.avatarUrl,
-      university: user.university,
-      faculty: user.faculty,
-      course: user.course,
-      skills: user.skills,
-      createdAt: user.createdAt,
-    );
-
-    final post = Post(
-      id: postId,
-      author: postAuthor,
-      content: _contentController.text.trim(),
-      images: imagePaths,
-      videoUrl: _video?.path,
-      tags: _selectedTags.toList(),
-      likesCount: 0,
-      commentsCount: 0,
-      sharesCount: 0,
-      createdAt: DateTime.now(),
-    );
 
     try {
       await ApiService.instance.createPost(
@@ -218,7 +190,8 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                           ClipRRect(
                             borderRadius: BorderRadius.circular(12),
                             child: Image.file(File(entry.value.path),
-                                width: 100, height: 100, fit: BoxFit.cover),
+                                width: 100, height: 100, fit: BoxFit.cover,
+                                cacheWidth: 100, cacheHeight: 100),
                           ),
                           Positioned(
                             top: 4,
