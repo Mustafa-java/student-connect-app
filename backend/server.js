@@ -879,6 +879,8 @@ app.delete('/api/projects/:id', authMiddleware, async (req, res) => {
       }
     }
 
+    await pool.query('UPDATE users SET projects_count = projects_count - 1 WHERE id = $1', [project.author_id]);
+
     await pool.query('DELETE FROM projects WHERE id = $1', [id]);
 
     console.log('Project deleted:', id);
@@ -1062,7 +1064,7 @@ app.get('/api/projects/:id/zip-file', authMiddleware, async (req, res) => {
     console.log('Found file:', project.zip_file_disk_name, 'Size:', fileStats.size, 'bytes');
     console.log('Original name:', project.zip_file_name);
 
-    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(project.zip_file_name)}"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(project.zip_file_name)}"; filename*=UTF-8''${encodeURIComponent(project.zip_file_name)}`);
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Length', fileStats.size);
 
